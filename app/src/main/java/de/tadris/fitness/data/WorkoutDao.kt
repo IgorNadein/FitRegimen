@@ -43,6 +43,9 @@ interface WorkoutDao {
     @Query("SELECT * FROM workout WHERE id = :id")
     fun findById(id: Long): Workout?
 
+    @Query("SELECT * FROM workout WHERE uuid = :uuid LIMIT 1")
+    fun findByUuid(uuid: String): Workout?
+
     @Query("SELECT * FROM route_sample WHERE id = :id")
     fun findSampleById(id: Long): RouteSample?
 
@@ -66,6 +69,58 @@ interface WorkoutDao {
 
     @Query("select * from workout order by start desc")
     fun getWorkoutsFlow(): Flow<List<Workout>>
+
+    /**
+     * User-facing history. Recorder workouts used as individual measurements
+     * inside a guided session or program occurrence remain in the database and
+     * backups, but the corresponding summary is the single workout shown and
+     * counted to avoid duplicate history/statistics entries.
+     */
+    @Query(
+        "SELECT workout.* FROM workout WHERE workout.id NOT IN (" +
+            "SELECT session_set.linkedWorkoutId FROM session_set " +
+            "INNER JOIN session_exercise ON session_exercise.id = session_set.sessionExerciseId " +
+            "INNER JOIN training_session ON training_session.id = session_exercise.sessionId " +
+            "WHERE session_set.linkedWorkoutId IS NOT NULL " +
+            "AND training_session.status IN ('COMPLETED', 'ABORTED') " +
+            "AND EXISTS (SELECT 1 FROM workout AS summary " +
+            "WHERE summary.uuid = 'guided-session:' || training_session.uuid)" +
+            ") AND workout.id NOT IN (" +
+            "SELECT program_completion.workoutId FROM program_completion " +
+            "INNER JOIN program_exercise " +
+            "ON program_exercise.id = program_completion.programExerciseId " +
+            "INNER JOIN program_occurrence_summary " +
+            "ON program_occurrence_summary.dayId = program_exercise.dayId " +
+            "AND program_occurrence_summary.occurrenceDate = program_completion.occurrenceDate " +
+            "WHERE program_completion.status = 1 " +
+            "AND program_completion.workoutId IS NOT NULL " +
+            "AND program_completion.workoutId != program_occurrence_summary.summaryWorkoutId" +
+            ") ORDER BY workout.start DESC"
+    )
+    fun getVisibleWorkouts(): List<Workout>
+
+    @Query(
+        "SELECT workout.* FROM workout WHERE workout.id NOT IN (" +
+            "SELECT session_set.linkedWorkoutId FROM session_set " +
+            "INNER JOIN session_exercise ON session_exercise.id = session_set.sessionExerciseId " +
+            "INNER JOIN training_session ON training_session.id = session_exercise.sessionId " +
+            "WHERE session_set.linkedWorkoutId IS NOT NULL " +
+            "AND training_session.status IN ('COMPLETED', 'ABORTED') " +
+            "AND EXISTS (SELECT 1 FROM workout AS summary " +
+            "WHERE summary.uuid = 'guided-session:' || training_session.uuid)" +
+            ") AND workout.id NOT IN (" +
+            "SELECT program_completion.workoutId FROM program_completion " +
+            "INNER JOIN program_exercise " +
+            "ON program_exercise.id = program_completion.programExerciseId " +
+            "INNER JOIN program_occurrence_summary " +
+            "ON program_occurrence_summary.dayId = program_exercise.dayId " +
+            "AND program_occurrence_summary.occurrenceDate = program_completion.occurrenceDate " +
+            "WHERE program_completion.status = 1 " +
+            "AND program_completion.workoutId IS NOT NULL " +
+            "AND program_completion.workoutId != program_occurrence_summary.summaryWorkoutId" +
+            ") ORDER BY workout.start DESC"
+    )
+    fun getVisibleWorkoutsFlow(): Flow<List<Workout>>
 
     @Query("SELECT * FROM workout ORDER BY start DESC LIMIT 1")
     fun getLastWorkout(): Workout?

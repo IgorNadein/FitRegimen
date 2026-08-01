@@ -61,7 +61,6 @@
     <string name="speechConfigNoSpeech">沒有公告</string>
     <string name="actionGrant">准許</string>
     <string name="aboutLinks">超連結 (links)</string>
-    <string name="aboutChangelog">更動日誌 (changelog)</string>
     <string name="aboutReportBug">回報錯誤 (report a bug)</string>
     <string name="locationData">位置資料</string>
     <string name="trackVisibilityPref">追蹤可見度</string>

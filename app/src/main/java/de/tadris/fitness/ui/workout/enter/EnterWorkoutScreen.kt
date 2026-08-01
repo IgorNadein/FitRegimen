@@ -20,10 +20,10 @@
 package de.tadris.fitness.ui.workout.enter
 
 import android.app.Application
-import android.app.DatePickerDialog
-import android.app.TimePickerDialog
+import android.text.format.DateFormat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -35,6 +35,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,9 +48,11 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -74,6 +78,9 @@ import de.tadris.fitness.Instance
 import de.tadris.fitness.R
 import de.tadris.fitness.ui.components.WorkoutTypePickerDialog
 import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 import java.util.Calendar
 import de.tadris.fitness.util.Icon as WorkoutIcon
 
@@ -231,37 +238,32 @@ private fun EnterWorkoutContent(
         )
     }
 
-
     if (showDateDialog) {
         val start = form.start
-        DisposableEffect(Unit) {
-            val dialog = DatePickerDialog(
-                context,
-                { _, year, month, day -> vm.setDate(year, month, day) },
-                start.get(Calendar.YEAR),
-                start.get(Calendar.MONTH),
-                start.get(Calendar.DAY_OF_MONTH),
-            )
-            dialog.setOnDismissListener { showDateDialog = false }
-            dialog.show()
-            onDispose { if (dialog.isShowing) dialog.dismiss() }
-        }
+        WorkoutDatePickerDialog(
+            initialYear = start.get(Calendar.YEAR),
+            initialMonth = start.get(Calendar.MONTH),
+            initialDay = start.get(Calendar.DAY_OF_MONTH),
+            onDismiss = { showDateDialog = false },
+            onConfirm = { year, month, day ->
+                vm.setDate(year, month, day)
+                showDateDialog = false
+            },
+        )
     }
 
     if (showTimeDialog) {
         val start = form.start
-        DisposableEffect(Unit) {
-            val dialog = TimePickerDialog(
-                context,
-                { _, hour, minute -> vm.setTime(hour, minute) },
-                start.get(Calendar.HOUR_OF_DAY),
-                start.get(Calendar.MINUTE),
-                true,
-            )
-            dialog.setOnDismissListener { showTimeDialog = false }
-            dialog.show()
-            onDispose { if (dialog.isShowing) dialog.dismiss() }
-        }
+        WorkoutTimePickerDialog(
+            initialHour = start.get(Calendar.HOUR_OF_DAY),
+            initialMinute = start.get(Calendar.MINUTE),
+            use24HourFormat = DateFormat.is24HourFormat(context),
+            onDismiss = { showTimeDialog = false },
+            onConfirm = { hour, minute ->
+                vm.setTime(hour, minute)
+                showTimeDialog = false
+            },
+        )
     }
 
     if (showDurationDialog) {
@@ -275,6 +277,104 @@ private fun EnterWorkoutContent(
         )
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WorkoutDatePickerDialog(
+    initialYear: Int,
+    /** Zero-based, matching [Calendar.MONTH] and [EnterWorkoutViewModel.setDate]. */
+    initialMonth: Int,
+    initialDay: Int,
+    onDismiss: () -> Unit,
+    onConfirm: (year: Int, month: Int, day: Int) -> Unit,
+) {
+    val initialDateMillis = remember(initialYear, initialMonth, initialDay) {
+        localDateToDatePickerMillis(initialYear, initialMonth, initialDay)
+    }
+    val pickerState = rememberDatePickerState(initialSelectedDateMillis = initialDateMillis)
+
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    pickerState.selectedDateMillis?.let { selectedMillis ->
+                        val selectedDate = datePickerMillisToLocalDate(selectedMillis)
+                        onConfirm(
+                            selectedDate.year,
+                            selectedDate.monthValue - 1,
+                            selectedDate.dayOfMonth,
+                        )
+                    }
+                },
+                enabled = pickerState.selectedDateMillis != null,
+            ) {
+                Text(stringResource(R.string.okay))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    ) {
+        DatePicker(
+            state = pickerState,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WorkoutTimePickerDialog(
+    initialHour: Int,
+    initialMinute: Int,
+    use24HourFormat: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (hour: Int, minute: Int) -> Unit,
+) {
+    val pickerState = rememberTimePickerState(
+        initialHour = initialHour,
+        initialMinute = initialMinute,
+        is24Hour = use24HourFormat,
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.workoutStartTime)) },
+        text = {
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                TimePicker(state = pickerState)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(pickerState.hour, pickerState.minute) }) {
+                Text(stringResource(R.string.okay))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
+}
+
+/** Material DatePicker represents calendar dates as UTC-midnight epoch milliseconds. */
+internal fun localDateToDatePickerMillis(year: Int, zeroBasedMonth: Int, day: Int): Long =
+    LocalDate.of(year, zeroBasedMonth + 1, day)
+        .atStartOfDay(ZoneOffset.UTC)
+        .toInstant()
+        .toEpochMilli()
+
+internal fun datePickerMillisToLocalDate(selectedDateMillis: Long): LocalDate =
+    Instant.ofEpochMilli(selectedDateMillis)
+        .atZone(ZoneOffset.UTC)
+        .toLocalDate()
 
 @Composable
 private fun DurationPickerDialog(

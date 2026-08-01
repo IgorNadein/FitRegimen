@@ -25,10 +25,12 @@ import androidx.lifecycle.viewModelScope
 import de.tadris.fitness.Instance
 import de.tadris.fitness.R
 import de.tadris.fitness.data.CalculatedValues
+import de.tadris.fitness.data.FitnessProfileSnapshot
 import de.tadris.fitness.data.Workout
 import de.tadris.fitness.data.WorkoutType
 import de.tadris.fitness.data.WorkoutTypeManager
 import de.tadris.fitness.data.calorie.CalorieCalculator
+import de.tadris.fitness.data.effectiveMeasurements
 import de.tadris.fitness.data.preferences.UserMeasurements.Companion.from
 import de.tadris.fitness.util.unit.DistanceUnitSystem
 import de.tadris.fitness.util.unit.UnitUtils
@@ -193,6 +195,14 @@ class EnterWorkoutViewModel(
                 val existingWorkout = if (form.isEditMode) {
                     instance.db.workoutDao().getWorkoutById(workoutId)!!
                 } else null
+                val profileSnapshot = existingWorkout?.let {
+                    FitnessProfileSnapshot(
+                        profileUuid = it.profileUuid,
+                        userWeightKg = it.userWeightKgSnapshot,
+                        stepLengthMeters = it.stepLengthMetersSnapshot,
+                    )
+                } ?: instance.fitnessProfileRepository.captureActiveSnapshot()
+                val effective = effectiveMeasurements(profileSnapshot, from(app))
 
                 val pauseDuration = existingWorkout?.pauseDuration ?: 0L
                 val activeDuration = form.durationMillis - pauseDuration
@@ -200,11 +210,12 @@ class EnterWorkoutViewModel(
                     CalculatedValues(app, existingWorkout).ascent.roundToInt()
                 } else 0
                 val energy = CalorieCalculator(app).calculateEnergy(
-                    from(app),
-                    activeDuration,
-                    ascent,
-                    form.workoutType.id,
-                    distanceMeters / (activeDuration / 1000.0),
+                    measurements = effective.asUserMeasurements(),
+                    userWeightKg = effective.weightKg,
+                    duration = activeDuration,
+                    ascent = ascent,
+                    workoutTypeId = form.workoutType.id,
+                    speed = distanceMeters / (activeDuration / 1000.0),
                 )
 
                 val workout = Workout(
@@ -219,6 +230,18 @@ class EnterWorkoutViewModel(
                     energy = energy,
                     workoutTypeId = form.workoutType.id,
                     intervalSetUsedId = existingWorkout?.intervalSetUsedId ?: -1,
+                    programUuid = existingWorkout?.programUuid,
+                    programName = existingWorkout?.programName,
+                    iconOverride = existingWorkout?.iconOverride,
+                    profileUuid = if (existingWorkout != null) {
+                        existingWorkout.profileUuid
+                    } else profileSnapshot.profileUuid,
+                    userWeightKgSnapshot = if (existingWorkout != null) {
+                        existingWorkout.userWeightKgSnapshot
+                    } else profileSnapshot.userWeightKg,
+                    stepLengthMetersSnapshot = if (existingWorkout != null) {
+                        existingWorkout.stepLengthMetersSnapshot
+                    } else profileSnapshot.stepLengthMeters,
                 )
 
                 if (existingWorkout != null) {

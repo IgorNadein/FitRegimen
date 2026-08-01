@@ -190,7 +190,6 @@
     <string name="avg">Átlag</string>
     <string name="deleteIntervalSet">Intervallumsorozat törlése</string>
     <string name="interval_name">Név:</string>
-    <string name="aboutChangelog">Változásnapló</string>
     <string name="workoutDiscarded">Edzés eldobva</string>
     <string name="aboutContributors">Közreműködők</string>
     <string name="preferencesUserInterfaceSummary">Az alkalmazás személyre szabása</string>

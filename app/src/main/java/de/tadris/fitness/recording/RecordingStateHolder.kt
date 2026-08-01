@@ -71,7 +71,7 @@ class RecordingStateHolder {
     fun initFresh(context: Context, workoutType: WorkoutType) {
         this.workoutType = workoutType
         recordingType = RecordingType.findById(workoutType.recordingType)
-        createFreshWorkout(workoutType).also {
+        createFreshWorkout(context, workoutType).also {
             workoutId = it.id
             Instance.getInstance(context).db.workoutDao().insertWorkout(it)
         }
@@ -84,6 +84,7 @@ class RecordingStateHolder {
     fun initExisting(context: Context) {
         val existingWorkout = Instance.getInstance(context).db.workoutDao().findRunningWorkout()
             ?: createFreshWorkout(
+                context,
                 WorkoutTypeManager.getInstance()
                     .getWorkoutTypeById(context, WorkoutTypeManager.WORKOUT_TYPE_ID_OTHER)
             ).also { Instance.getInstance(context).db.workoutDao().insertWorkout(it) }
@@ -109,18 +110,24 @@ class RecordingStateHolder {
         lastStateChange = System.currentTimeMillis()
     }
 
-    private fun createFreshWorkout(workoutType: WorkoutType) = Workout(
-        id = System.nanoTime(),
-        uuid = UUID.randomUUID().toString(),
-        start = -1,
-        end = RUNNING_WORKOUT_END_TIME,
-        activeDuration = 0,
-        comment = "",
-        distance = 0.0,
-        repetitions = 0,
-        energy = 0.0,
-        workoutTypeId = workoutType.id,
-        intervalSetUsedId = -1
-    )
+    private fun createFreshWorkout(context: Context, workoutType: WorkoutType): Workout {
+        val profile = Instance.getInstance(context).fitnessProfileRepository.captureActiveSnapshot()
+        return Workout(
+            id = System.nanoTime(),
+            uuid = UUID.randomUUID().toString(),
+            start = -1,
+            end = RUNNING_WORKOUT_END_TIME,
+            activeDuration = 0,
+            comment = "",
+            distance = 0.0,
+            repetitions = 0,
+            energy = 0.0,
+            workoutTypeId = workoutType.id,
+            intervalSetUsedId = -1,
+            profileUuid = profile.profileUuid,
+            userWeightKgSnapshot = profile.userWeightKg,
+            stepLengthMetersSnapshot = profile.stepLengthMeters,
+        )
+    }
 
 }

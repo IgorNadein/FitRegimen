@@ -19,6 +19,7 @@
 
 <resources>
     <color name="colorPrimary">#FB8C00</color>
+    <color name="colorBrandOrange">#FFA228</color>
     <color name="colorPrimaryDark">#EF6C00</color>
     <color name="colorPrimaryDebug">#005DD7</color>
 

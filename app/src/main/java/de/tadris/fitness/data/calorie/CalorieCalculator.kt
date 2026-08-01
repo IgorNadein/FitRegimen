@@ -21,6 +21,7 @@ package de.tadris.fitness.data.calorie
 import android.content.Context
 import de.tadris.fitness.data.CalculatedValues
 import de.tadris.fitness.data.WorkoutData
+import de.tadris.fitness.data.effectiveMeasurements
 import de.tadris.fitness.data.preferences.UserMeasurements
 import de.tadris.fitness.util.unit.Kcal
 import kotlin.math.roundToInt
@@ -35,14 +36,18 @@ class CalorieCalculator(val provider: List<METProvider>) {
         )
     )
 
-    fun calculateEnergy(context: Context, data: WorkoutData): Double =
-        calculateEnergy(
-            UserMeasurements.from(context),
+    fun calculateEnergy(context: Context, data: WorkoutData): Double {
+        val current = UserMeasurements.from(context)
+        val effective = data.workout.effectiveMeasurements(current)
+        return calculateEnergy(
+            effective.asUserMeasurements(),
+            effective.weightKg,
             data.workout.activeDuration,
             CalculatedValues(data).getAscentAndDescent().first.roundToInt(),
             data.workout.workoutTypeId,
             data.workout.averageSpeedActive
         )
+    }
 
     fun calculateEnergy(
         measurements: UserMeasurements,
@@ -53,14 +58,50 @@ class CalorieCalculator(val provider: List<METProvider>) {
     ) =
         Kcal().toJoules(calculateCalories(measurements, duration, ascent, workoutTypeId, speed))
 
+    /** Keeps the captured profile weight's decimal precision while retaining MET compatibility. */
+    fun calculateEnergy(
+        measurements: UserMeasurements,
+        userWeightKg: Double,
+        duration: Long,
+        ascent: Int,
+        workoutTypeId: String,
+        speed: Double,
+    ) = Kcal().toJoules(
+        calculateCalories(
+            measurements = measurements,
+            userWeightKg = userWeightKg,
+            duration = duration,
+            ascent = ascent,
+            workoutTypeId = workoutTypeId,
+            speed = speed,
+        )
+    )
+
     fun calculateCalories(
         measurements: UserMeasurements,
         duration: Long,
         ascent: Int,
         workoutTypeId: String,
         speed: Double // m/s
+    ): Double = calculateCalories(
+        measurements = measurements,
+        userWeightKg = measurements.weight.toDouble(),
+        duration = duration,
+        ascent = ascent,
+        workoutTypeId = workoutTypeId,
+        speed = speed,
+    )
+
+    fun calculateCalories(
+        measurements: UserMeasurements,
+        userWeightKg: Double,
+        duration: Long,
+        ascent: Int,
+        workoutTypeId: String,
+        speed: Double,
     ): Double {
-        val weight = measurements.weight.toDouble()
+        val weight = userWeightKg.takeIf { it.isFinite() && it > 0.0 }
+            ?: measurements.weight.toDouble()
         val mins = (duration / 1000).toDouble() / 60
         return (mins * (getMET(measurements, workoutTypeId, speed) * 3.5 * weight) / 200) + ascent
     }

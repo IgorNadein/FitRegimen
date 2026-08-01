@@ -49,6 +49,17 @@ public class AutoExportPlanner {
         }
     }
 
+    /**
+     * Refreshes only the periodic WorkManager schedule after portable preferences
+     * were restored. Unlike {@link #planAutoBackup()}, this deliberately does not
+     * send an immediate backup to a previously configured local target.
+     */
+    public void refreshAutoBackupSchedule() {
+        for (ExportTargetConfiguration configuration : getConfigurations(ExportSource.EXPORT_SOURCE_BACKUP)) {
+            planAutoBackupFor(configuration);
+        }
+    }
+
     public void planAutoBackupFor(ExportTargetConfiguration configuration) {
         Data data = new Data.Builder()
                 .putString(AutoExporter.DATA_SOURCE_TYPE, ExportSource.EXPORT_SOURCE_BACKUP)

@@ -37,8 +37,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -57,20 +55,8 @@ fun InterfaceSettingsScreen(onBack: () -> Unit) {
     val prefs = remember { instance.userPreferences }
     val sharedPrefs = remember { prefs.preferences }
 
-    // Refresh unit system so conversions are up-to-date
-    remember { instance.distanceUnitUtils.setUnit(); true }
-    val unitSystem = remember { instance.distanceUnitUtils.distanceUnitSystem }
-
     // --- Unit system ---
     var unitSystemId by remember { mutableStateOf(prefs.distanceUnitSystemId) }
-
-    // --- Weight ---
-    var weightKg by remember { mutableIntStateOf(prefs.userWeight) }
-    var showWeightDialog by remember { mutableStateOf(false) }
-
-    // --- Step length ---
-    var stepLengthMeters by remember { mutableFloatStateOf(prefs.stepLength) }
-    var showStepLengthDialog by remember { mutableStateOf(false) }
 
     // --- Map preferences ---
     var mapStyle by remember { mutableStateOf(prefs.mapStyle) }
@@ -143,26 +129,6 @@ fun InterfaceSettingsScreen(onBack: () -> Unit) {
                         unitSystemId = value
                         prefs.distanceUnitSystemId = value
                     },
-                )
-            }
-
-            item {
-                val displayWeight = Math.round(unitSystem.getWeightFromKilogram(weightKg.toDouble()))
-                val weightUnit = unitSystem.weightUnit
-                ClickableSettingsItem(
-                    title = stringResource(R.string.pref_weight),
-                    supporting = "$displayWeight $weightUnit",
-                    onClick = { showWeightDialog = true },
-                )
-            }
-
-            item {
-                val displayStepLength = Math.round(unitSystem.getDistanceFromCentimeters((stepLengthMeters * 100).toDouble()))
-                val stepUnit = unitSystem.reallyShortDistanceUnit
-                ClickableSettingsItem(
-                    title = stringResource(R.string.pref_step_length),
-                    supporting = "$displayStepLength $stepUnit",
-                    onClick = { showStepLengthDialog = true },
                 )
             }
 
@@ -253,7 +219,7 @@ fun InterfaceSettingsScreen(onBack: () -> Unit) {
                     onValueChange = { value ->
                         themeSetting = value
                         prefs.themeSetting = value
-                        Toast.makeText(context, R.string.hintRestart, Toast.LENGTH_LONG).show()
+                        instance.themes.updateDarkModeSetting()
                     },
                 )
             }
@@ -262,11 +228,11 @@ fun InterfaceSettingsScreen(onBack: () -> Unit) {
                 item {
                     SwitchSettingsItem(
                         title = stringResource(R.string.pref_use_system_colors),
+                        supporting = stringResource(R.string.pref_use_system_colors_summary),
                         checked = useSystemColors,
                         onCheckedChange = { value ->
                             useSystemColors = value
                             prefs.useSystemColors = value
-                            Toast.makeText(context, R.string.hintRestart, Toast.LENGTH_LONG).show()
                         },
                     )
                 }
@@ -326,35 +292,4 @@ fun InterfaceSettingsScreen(onBack: () -> Unit) {
         }
     }
 
-    if (showWeightDialog) {
-        SliderPickerDialog(
-            title = stringResource(R.string.pref_weight),
-            initialValue = unitSystem.getWeightFromKilogram(weightKg.toDouble()).toFloat(),
-            valueRange = unitSystem.getWeightFromKilogram(20.0).toFloat()..unitSystem.getWeightFromKilogram(400.0).toFloat(),
-            unit = unitSystem.weightUnit,
-            onDismiss = { showWeightDialog = false },
-            onConfirm = { displayValue ->
-                val kilograms = Math.round(unitSystem.getKilogramFromUnit(displayValue.toDouble())).toInt()
-                sharedPrefs.edit().putInt("weight", kilograms).apply()
-                weightKg = kilograms
-                showWeightDialog = false
-            },
-        )
-    }
-
-    if (showStepLengthDialog) {
-        SliderPickerDialog(
-            title = stringResource(R.string.pref_step_length),
-            initialValue = unitSystem.getDistanceFromCentimeters((stepLengthMeters * 100).toDouble()).toFloat(),
-            valueRange = unitSystem.getDistanceFromCentimeters(50.0).toFloat()..unitSystem.getDistanceFromCentimeters(150.0).toFloat(),
-            unit = unitSystem.reallyShortDistanceUnit,
-            onDismiss = { showStepLengthDialog = false },
-            onConfirm = { displayValue ->
-                val meters = (unitSystem.getCentimetersFromReallyShortDistance(displayValue.toDouble()) / 100).toFloat()
-                prefs.stepLength = meters
-                stepLengthMeters = meters
-                showStepLengthDialog = false
-            },
-        )
-    }
 }

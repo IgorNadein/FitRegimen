@@ -28,6 +28,7 @@ import android.util.Log;
 import androidx.annotation.Nullable;
 
 import de.tadris.fitness.data.AppDatabase;
+import de.tadris.fitness.data.FitnessProfileRepository;
 import de.tadris.fitness.data.RecordingType;
 import de.tadris.fitness.data.Workout;
 import de.tadris.fitness.data.WorkoutType;
@@ -48,7 +49,7 @@ public class Instance {
 
     private static final String TAG = "Instance";
 
-    private static Instance instance;
+    private static volatile Instance instance;
 
     /**
      * Please use getInstance with context. Without context could return null if no Instance was created
@@ -63,13 +64,21 @@ public class Instance {
         if (context == null) {
             Log.v(TAG, "no Context Provided");
         }
-        if (instance == null && context != null) {
-            instance = new Instance(context);
+        Instance current = instance;
+        if (current == null && context != null) {
+            synchronized (Instance.class) {
+                current = instance;
+                if (current == null) {
+                    current = new Instance(context.getApplicationContext());
+                    instance = current;
+                }
+            }
         }
-        return instance;
+        return current;
     }
 
     public final AppDatabase db;
+    public final FitnessProfileRepository fitnessProfileRepository;
     public final UserPreferences userPreferences;
     public final FitoTrackThemes themes;
     public final UserDateTimeUtils userDateTimeUtils;
@@ -80,13 +89,18 @@ public class Instance {
     public final ShortcutsUtils shortcuts;
 
     private Instance(Context context) {
-        instance = this;
         userPreferences = new UserPreferences(context);
         themes = new FitoTrackThemes(context);
         userDateTimeUtils = new UserDateTimeUtils(userPreferences);
-        distanceUnitUtils = new DistanceUnitUtils(context);
-        energyUnitUtils = new EnergyUnitUtils(context);
+        distanceUnitUtils = new DistanceUnitUtils(context, userPreferences);
+        energyUnitUtils = new EnergyUnitUtils(context, userPreferences);
         db = AppDatabase.provideDatabase(context);
+        fitnessProfileRepository = new FitnessProfileRepository(
+                db,
+                userPreferences,
+                context.getString(R.string.fitness_profile_default_name)
+        );
+        fitnessProfileRepository.ensureDefaultProfile();
         planner = new AutoExportPlanner(context);
         logger = new WorkoutLogger(context);
         shortcuts = new ShortcutsUtils(context);

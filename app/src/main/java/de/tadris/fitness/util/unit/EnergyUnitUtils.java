@@ -21,19 +21,25 @@ package de.tadris.fitness.util.unit;
 
 import android.content.Context;
 
-import de.tadris.fitness.Instance;
+import de.tadris.fitness.data.preferences.UserPreferences;
 
 public class EnergyUnitUtils extends UnitUtils {
 
     private EnergyUnit energyUnit;
+    private final UserPreferences userPreferences;
 
     public EnergyUnitUtils(Context context) {
+        this(context, new UserPreferences(context.getApplicationContext()));
+    }
+
+    public EnergyUnitUtils(Context context, UserPreferences userPreferences) {
         super(context);
+        this.userPreferences = userPreferences;
         setUnit();
     }
 
     public void setUnit() {
-        energyUnit = getUnitById(Instance.getInstance(context).userPreferences.getEnergyUnit());
+        energyUnit = getUnitById(userPreferences.getEnergyUnit());
     }
 
     private EnergyUnit getUnitById(String id) {

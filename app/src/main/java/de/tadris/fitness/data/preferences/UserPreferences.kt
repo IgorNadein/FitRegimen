@@ -43,7 +43,7 @@ class UserPreferences(private val context: Context) : PreferenceProvider {
         SharingScreenInformationPreferences(this.preferences)
 
     val userWeight: Int
-        get() = preferences.getInt("weight", 80)
+        get() = preferences.getInt(USER_WEIGHT, DEFAULT_USER_WEIGHT_KG)
 
     val spokenUpdateTimePeriod: Int
         get() = preferences.getInt(VOICE_ANNOUNCEMENTS_INTERVAL_TIME, 0)
@@ -120,6 +120,9 @@ class UserPreferences(private val context: Context) : PreferenceProvider {
 
     var firstStart by BooleanSharedPreference("firstStart", true)
 
+    /** Version of the derived program-workout projection applied to existing data. */
+    var programWorkoutProjectionVersion by IntSharedPreference("programWorkoutProjectionVersion", 0)
+
     var autoTimeout by IntSharedPreference("autoTimeoutPeriod", 20)
 
     var useAutoPause by BooleanSharedPreference("autoPause", true)
@@ -148,7 +151,19 @@ class UserPreferences(private val context: Context) : PreferenceProvider {
 
     var upperTargetSpeedLimit by FloatSharedPreference("upperTargetSpeedLimit", 3f)
 
-    var stepLength by FloatSharedPreference(STEP_LENGTH, 0.79f)
+    var stepLength by FloatSharedPreference(STEP_LENGTH, DEFAULT_STEP_LENGTH_METERS)
+
+    /**
+     * Compatibility bridge for code that still reads measurements synchronously.
+     * [de.tadris.fitness.data.FitnessProfileRepository] is the sole profile
+     * mutation boundary and mirrors its active profile through this method.
+     */
+    fun setLegacyMeasurements(weightKg: Int, stepLengthMeters: Float) {
+        preferences.edit {
+            putInt(USER_WEIGHT, weightKg)
+            putFloat(STEP_LENGTH, stepLengthMeters)
+        }
+    }
 
     val lastVersionCode: Int
         get() = preferences.getInt("lastVersion", BuildConfig.VERSION_CODE)
@@ -188,6 +203,9 @@ class UserPreferences(private val context: Context) : PreferenceProvider {
         get() = UserMeasurements(userWeight, stepLength)
 
     companion object {
+        const val USER_WEIGHT: String = "weight"
+        const val DEFAULT_USER_WEIGHT_KG: Int = 80
+        const val DEFAULT_STEP_LENGTH_METERS: Float = 0.79f
         private const val FIRST_DAY_OF_WEEK_VARIABLE = "firstDayOfWeek"
         const val STEP_LENGTH: String = "stepLength"
         const val STATISTICS_AGGREGATION_SPAN: String = "statisticsAggregationSpan"

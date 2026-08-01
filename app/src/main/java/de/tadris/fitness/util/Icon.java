@@ -53,6 +53,7 @@ public enum Icon {
     PUSH_UPS("push_ups", R.drawable.ic_push_ups),
     PULL_UPS("pull_ups", R.drawable.ic_pull_ups),
     TRAMPOLINE_JUMPING("trampoline_jumping", R.drawable.ic_trampoline_jumping),
+    ACTIVITY("activity", R.drawable.ic_activity),
     WHEELCHAIR("wheelchair", R.drawable.ic_wheelchair),
     WHEELCHAIR_FAST("wheelchair_fast", R.drawable.ic_wheelchair_fast),
     OTHER("other", R.drawable.ic_other);

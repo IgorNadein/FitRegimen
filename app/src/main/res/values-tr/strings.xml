@@ -58,7 +58,6 @@
     <string name="aboutLinks">Bağlantılar</string>
     <string name="aboutReportBug">Hata bildir</string>
     <string name="aboutOpenSourceLibraries">Açık kaynaklı kütüphaneler</string>
-    <string name="aboutChangelog">Değişiklik günlüğü</string>
     <string name="aboutVersion">Sürüm</string>
     <string name="aboutTitle">Hakkında</string>
     <string name="editWorkout">Egzersizi Düzenle</string>

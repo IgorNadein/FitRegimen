@@ -21,20 +21,26 @@ package de.tadris.fitness.util.unit;
 
 import android.content.Context;
 
-import de.tadris.fitness.Instance;
 import de.tadris.fitness.R;
+import de.tadris.fitness.data.preferences.UserPreferences;
 
 public class DistanceUnitUtils extends UnitUtils {
 
     private DistanceUnitSystem distanceUnitSystem;
+    private final UserPreferences userPreferences;
 
     public DistanceUnitUtils(Context context) {
+        this(context, new UserPreferences(context.getApplicationContext()));
+    }
+
+    public DistanceUnitUtils(Context context, UserPreferences userPreferences) {
         super(context);
+        this.userPreferences = userPreferences;
         setUnit();
     }
 
     public void setUnit() {
-        String id = Instance.getInstance(context).userPreferences.getDistanceUnitSystemId();
+        String id = userPreferences.getDistanceUnitSystemId();
         distanceUnitSystem = getUnitById(Integer.parseInt(id));
     }
 

@@ -25,10 +25,11 @@ import androidx.annotation.NonNull;
 import androidx.room.Database;
 import androidx.room.Room;
 import androidx.room.RoomDatabase;
+import androidx.room.TypeConverters;
 import androidx.room.migration.Migration;
 import androidx.sqlite.db.SupportSQLiteDatabase;
 
-@Database(version = 20, entities = {
+@Database(version = 28, entities = {
         Workout.class,
         RouteSample.class,
         WorkoutPause.class,
@@ -40,9 +41,28 @@ import androidx.sqlite.db.SupportSQLiteDatabase;
         WorkoutType.class,
         ExportTargetConfiguration.class,
         TrainingProgram.class,
-        ProgramTask.class,
+        Exercise.class,
+        ProgramDay.class,
+        ProgramExercise.class,
+        ProgramSet.class,
         ProgramCompletion.class,
+        ProgramOccurrenceSummary.class,
+        SetLog.class,
+        TrainingSession.class,
+        SessionExercise.class,
+        SessionSet.class,
+        FitnessProfile.class,
 }, exportSchema = false)
+@TypeConverters({
+        MetricKindConverter.class,
+        SetTypeConverter.class,
+        MeasurementSourceConverter.class,
+        CompletionRuleConverter.class,
+        TrainingSessionStatusConverter.class,
+        TrainingSessionPhaseConverter.class,
+        SessionExerciseStatusConverter.class,
+        SessionSetStatusConverter.class,
+})
 public abstract class AppDatabase extends RoomDatabase {
 
     private static final String DATABASE_NAME = "fitregimen";
@@ -56,6 +76,12 @@ public abstract class AppDatabase extends RoomDatabase {
     public abstract ExportTargetDao exportTargetDao();
 
     public abstract TrainingProgramDao trainingProgramDao();
+
+    public abstract ExerciseDao exerciseDao();
+
+    public abstract TrainingSessionDao trainingSessionDao();
+
+    public abstract FitnessProfileDao fitnessProfileDao();
 
     public long getLastWorkoutTimeByType(String type) {
         Workout workout = workoutDao().getLastWorkoutByType(type);
@@ -77,11 +103,168 @@ public abstract class AppDatabase extends RoomDatabase {
             db.execSQL("DELETE FROM interval");
             db.execSQL("DELETE FROM interval_set");
             db.execSQL("DELETE FROM workout_type");
+            db.execSQL("DELETE FROM session_set");
+            db.execSQL("DELETE FROM session_exercise");
+            db.execSQL("DELETE FROM training_session");
+            db.execSQL("DELETE FROM set_log");
+            db.execSQL("DELETE FROM program_occurrence_summary");
             db.execSQL("DELETE FROM program_completion");
-            db.execSQL("DELETE FROM program_task");
+            db.execSQL("DELETE FROM program_set");
+            db.execSQL("DELETE FROM program_exercise");
+            db.execSQL("DELETE FROM program_day");
             db.execSQL("DELETE FROM training_program");
+            db.execSQL("DELETE FROM exercise");
+            db.execSQL("DELETE FROM fitness_profile");
             db.execSQL("DELETE FROM workout");
         });
+    }
+
+    /**
+     * Converts the v20 flat program_task model into the v21 day/exercise/set tree.
+     * Exercise ids deliberately reuse task ids, making completion remapping exact and
+     * avoiding a lossy Java-side id map inside the Room migration.
+     */
+    private static void migratePrograms20To21(@NonNull SupportSQLiteDatabase db) {
+        db.execSQL("ALTER TABLE program_completion RENAME TO program_completion_v20");
+        db.execSQL("ALTER TABLE program_task RENAME TO program_task_v20");
+        db.execSQL("ALTER TABLE training_program RENAME TO training_program_v20");
+        // SQLite keeps index names when a table is renamed; release names reused by v21.
+        db.execSQL("DROP INDEX IF EXISTS index_program_completion_workoutId");
+        db.execSQL("DROP INDEX IF EXISTS index_program_completion_programTaskId");
+        db.execSQL("DROP INDEX IF EXISTS index_program_task_programId");
+
+        db.execSQL("CREATE TABLE training_program (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+                "uuid TEXT NOT NULL," +
+                "name TEXT NOT NULL," +
+                "description TEXT," +
+                "startDate INTEGER," +
+                "createdAt INTEGER NOT NULL)");
+        db.execSQL("INSERT INTO training_program (id, uuid, name, description, startDate, createdAt) " +
+                "SELECT id, uuid, name, description, startDate, createdAt FROM training_program_v20");
+
+        db.execSQL("CREATE TABLE exercise (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+                "uuid TEXT NOT NULL," +
+                "name TEXT NOT NULL," +
+                "metricKind TEXT NOT NULL," +
+                "workoutTypeId TEXT," +
+                "description TEXT," +
+                "tips TEXT," +
+                "videoUrl TEXT," +
+                "imagePath TEXT," +
+                "hidden INTEGER NOT NULL)");
+        db.execSQL("INSERT INTO exercise " +
+                "(id, uuid, name, metricKind, workoutTypeId, description, tips, videoUrl, imagePath, hidden) " +
+                "SELECT task.id, 'legacy-program-task-' || task.id, " +
+                "COALESCE((SELECT title FROM workout_type WHERE id = task.workoutTypeId), task.workoutTypeId), " +
+                "CASE WHEN task.targetDistanceMeters IS NOT NULL THEN 'DISTANCE_DURATION' " +
+                "WHEN task.targetDurationMillis IS NOT NULL AND task.targetReps IS NULL THEN 'DURATION' " +
+                "ELSE 'REPS' END, " +
+                "task.workoutTypeId, NULL, NULL, NULL, NULL, 0 FROM program_task_v20 task");
+
+        db.execSQL("CREATE TABLE program_day (" +
+                "programId INTEGER NOT NULL," +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+                "orderIndex INTEGER NOT NULL," +
+                "name TEXT," +
+                "isRest INTEGER NOT NULL," +
+                "FOREIGN KEY (programId) REFERENCES training_program(id) ON DELETE CASCADE)");
+        db.execSQL("CREATE INDEX index_program_day_programId ON program_day (programId)");
+        db.execSQL("WITH RECURSIVE " +
+                "bounds(programId, maxDays) AS (" +
+                "SELECT program.id, MAX(program.cycleLengthDays, COALESCE((" +
+                "SELECT MAX(task.dayIndex) + 1 FROM program_task_v20 task WHERE task.programId = program.id), 0)) " +
+                "FROM training_program_v20 program), " +
+                "days(programId, dayIndex, maxDays) AS (" +
+                "SELECT programId, 0, maxDays FROM bounds WHERE maxDays > 0 " +
+                "UNION ALL SELECT programId, dayIndex + 1, maxDays FROM days WHERE dayIndex + 1 < maxDays) " +
+                "INSERT INTO program_day (programId, orderIndex, name, isRest) " +
+                "SELECT days.programId, days.dayIndex, (" +
+                "SELECT task.dayTitle FROM program_task_v20 task " +
+                "WHERE task.programId = days.programId AND task.dayIndex = days.dayIndex " +
+                "AND task.dayTitle IS NOT NULL ORDER BY task.orderIndex, task.id LIMIT 1), " +
+                "CASE WHEN EXISTS (SELECT 1 FROM program_task_v20 task " +
+                "WHERE task.programId = days.programId AND task.dayIndex = days.dayIndex) THEN 0 ELSE 1 END " +
+                "FROM days ORDER BY days.programId, days.dayIndex");
+
+        db.execSQL("CREATE TABLE program_exercise (" +
+                "dayId INTEGER NOT NULL," +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+                "orderIndex INTEGER NOT NULL," +
+                "exerciseId INTEGER NOT NULL," +
+                "note TEXT," +
+                "restSeconds INTEGER," +
+                "supersetGroup INTEGER," +
+                "FOREIGN KEY (dayId) REFERENCES program_day(id) ON DELETE CASCADE," +
+                "FOREIGN KEY (exerciseId) REFERENCES exercise(id))");
+        db.execSQL("CREATE INDEX index_program_exercise_dayId ON program_exercise (dayId)");
+        db.execSQL("CREATE INDEX index_program_exercise_exerciseId ON program_exercise (exerciseId)");
+        db.execSQL("INSERT INTO program_exercise " +
+                "(dayId, id, orderIndex, exerciseId, note, restSeconds, supersetGroup) " +
+                "SELECT day.id, task.id, task.orderIndex, task.id, task.note, NULL, NULL " +
+                "FROM program_task_v20 task INNER JOIN program_day day " +
+                "ON day.programId = task.programId AND day.orderIndex = task.dayIndex");
+
+        db.execSQL("CREATE TABLE program_set (" +
+                "programExerciseId INTEGER NOT NULL," +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+                "orderIndex INTEGER NOT NULL," +
+                "type TEXT NOT NULL," +
+                "reps INTEGER," +
+                "repsMax INTEGER," +
+                "weightKg REAL," +
+                "durationMillis INTEGER," +
+                "distanceMeters REAL," +
+                "FOREIGN KEY (programExerciseId) REFERENCES program_exercise(id) ON DELETE CASCADE)");
+        db.execSQL("CREATE INDEX index_program_set_programExerciseId ON program_set (programExerciseId)");
+        db.execSQL("WITH RECURSIVE set_rows(programExerciseId, setIndex, setCount, reps, durationMillis, distanceMeters) AS (" +
+                "SELECT id, 0, CASE WHEN targetSets IS NULL OR targetSets < 1 THEN 1 ELSE targetSets END, " +
+                "targetReps, targetDurationMillis, targetDistanceMeters FROM program_task_v20 " +
+                "UNION ALL SELECT programExerciseId, setIndex + 1, setCount, reps, durationMillis, distanceMeters " +
+                "FROM set_rows WHERE setIndex + 1 < setCount) " +
+                "INSERT INTO program_set " +
+                "(programExerciseId, orderIndex, type, reps, repsMax, weightKg, durationMillis, distanceMeters) " +
+                "SELECT programExerciseId, setIndex, 'NORMAL', reps, NULL, NULL, durationMillis, distanceMeters " +
+                "FROM set_rows ORDER BY programExerciseId, setIndex");
+
+        db.execSQL("CREATE TABLE program_completion (" +
+                "programExerciseId INTEGER NOT NULL," +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+                "occurrenceDate INTEGER NOT NULL," +
+                "status INTEGER NOT NULL," +
+                "workoutId INTEGER," +
+                "completedAt INTEGER NOT NULL," +
+                "FOREIGN KEY (programExerciseId) REFERENCES program_exercise(id) ON DELETE CASCADE," +
+                "FOREIGN KEY (workoutId) REFERENCES workout(id) ON DELETE SET NULL)");
+        db.execSQL("CREATE UNIQUE INDEX index_program_completion_programExerciseId_occurrenceDate " +
+                "ON program_completion (programExerciseId, occurrenceDate)");
+        db.execSQL("CREATE INDEX index_program_completion_workoutId ON program_completion (workoutId)");
+        db.execSQL("INSERT OR IGNORE INTO program_completion " +
+                "(programExerciseId, id, occurrenceDate, status, workoutId, completedAt) " +
+                "SELECT programTaskId, id, occurrenceDate, status, workoutId, 0 " +
+                "FROM program_completion_v20 ORDER BY id");
+
+        db.execSQL("CREATE TABLE set_log (" +
+                "completionId INTEGER NOT NULL," +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+                "orderIndex INTEGER NOT NULL," +
+                "type TEXT NOT NULL," +
+                "reps INTEGER," +
+                "weightKg REAL," +
+                "durationMillis INTEGER," +
+                "distanceMeters REAL," +
+                "targetReps INTEGER," +
+                "targetRepsMax INTEGER," +
+                "targetWeightKg REAL," +
+                "targetDurationMillis INTEGER," +
+                "targetDistanceMeters REAL," +
+                "FOREIGN KEY (completionId) REFERENCES program_completion(id) ON DELETE CASCADE)");
+        db.execSQL("CREATE INDEX index_set_log_completionId ON set_log (completionId)");
+
+        db.execSQL("DROP TABLE program_completion_v20");
+        db.execSQL("DROP TABLE program_task_v20");
+        db.execSQL("DROP TABLE training_program_v20");
     }
 
     public static AppDatabase provideDatabase(Context context) {
@@ -694,6 +877,213 @@ public abstract class AppDatabase extends RoomDatabase {
                         } finally {
                             db.endTransaction();
                         }
+                    }
+                }, new Migration(20, 21) {
+                    @Override
+                    public void migrate(@NonNull SupportSQLiteDatabase db) {
+                        try {
+                            db.beginTransaction();
+
+                            migratePrograms20To21(db);
+
+                            db.setTransactionSuccessful();
+                        } finally {
+                            db.endTransaction();
+                        }
+                    }
+                }, new Migration(21, 22) {
+                    @Override
+                    public void migrate(@NonNull SupportSQLiteDatabase db) {
+                        try {
+                            db.beginTransaction();
+
+                            db.execSQL("ALTER TABLE program_exercise ADD COLUMN measurementSource TEXT NOT NULL DEFAULT 'USER_INPUT'");
+                            db.execSQL("ALTER TABLE program_exercise ADD COLUMN completionRule TEXT NOT NULL DEFAULT 'USER_CONFIRM'");
+                            db.execSQL("ALTER TABLE program_exercise ADD COLUMN prepareSeconds INTEGER NOT NULL DEFAULT 0");
+                            db.execSQL("ALTER TABLE program_exercise ADD COLUMN transitionSeconds INTEGER");
+
+                            // Existing recordable entries retain their recorder intent. Pure duration
+                            // entries become deterministic clock timers; everything else stays manual.
+                            db.execSQL("UPDATE program_exercise SET " +
+                                    "measurementSource = 'RECORDER', completionRule = 'METRIC_TARGET_REACHED' " +
+                                    "WHERE exerciseId IN (SELECT id FROM exercise WHERE workoutTypeId IS NOT NULL AND workoutTypeId != '')");
+                            db.execSQL("UPDATE program_exercise SET completionRule = 'DURATION_REACHED' " +
+                                    "WHERE exerciseId IN (SELECT id FROM exercise WHERE " +
+                                    "metricKind IN ('DURATION', 'WEIGHT_DURATION') " +
+                                    "AND workoutTypeId IS NOT NULL AND workoutTypeId != '')");
+                            db.execSQL("UPDATE program_exercise SET " +
+                                    "measurementSource = 'CLOCK', completionRule = 'DURATION_REACHED' " +
+                                    "WHERE exerciseId IN (SELECT id FROM exercise WHERE " +
+                                    "metricKind IN ('DURATION', 'WEIGHT_DURATION', 'DISTANCE_DURATION') " +
+                                    "AND (workoutTypeId IS NULL OR workoutTypeId = ''))");
+
+                            db.execSQL("CREATE TABLE training_session (" +
+                                    "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+                                    "uuid TEXT NOT NULL," +
+                                    "sourceProgramId INTEGER," +
+                                    "sourceDayId INTEGER," +
+                                    "occurrenceDate INTEGER," +
+                                    "zoneId TEXT," +
+                                    "nameSnapshot TEXT NOT NULL," +
+                                    "descriptionSnapshot TEXT," +
+                                    "status TEXT NOT NULL," +
+                                    "phase TEXT NOT NULL," +
+                                    "currentExerciseIndex INTEGER NOT NULL," +
+                                    "currentSetIndex INTEGER NOT NULL," +
+                                    "startedAt INTEGER NOT NULL," +
+                                    "updatedAt INTEGER NOT NULL," +
+                                    "completedAt INTEGER," +
+                                    "phaseStartedAt INTEGER," +
+                                    "phaseDeadlineAt INTEGER," +
+                                    "pausedRemainingMillis INTEGER," +
+                                    "FOREIGN KEY (sourceProgramId) REFERENCES training_program(id) ON DELETE SET NULL," +
+                                    "FOREIGN KEY (sourceDayId) REFERENCES program_day(id) ON DELETE SET NULL)");
+                            db.execSQL("CREATE UNIQUE INDEX index_training_session_uuid ON training_session (uuid)");
+                            db.execSQL("CREATE INDEX index_training_session_sourceProgramId ON training_session (sourceProgramId)");
+                            db.execSQL("CREATE INDEX index_training_session_sourceDayId ON training_session (sourceDayId)");
+                            db.execSQL("CREATE INDEX index_training_session_status ON training_session (status)");
+
+                            db.execSQL("CREATE TABLE session_exercise (" +
+                                    "sessionId INTEGER NOT NULL," +
+                                    "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+                                    "orderIndex INTEGER NOT NULL," +
+                                    "sourceProgramExerciseId INTEGER," +
+                                    "sourceExerciseId INTEGER," +
+                                    "exerciseUuidSnapshot TEXT NOT NULL," +
+                                    "nameSnapshot TEXT NOT NULL," +
+                                    "metricKindSnapshot TEXT NOT NULL," +
+                                    "workoutTypeIdSnapshot TEXT," +
+                                    "descriptionSnapshot TEXT," +
+                                    "tipsSnapshot TEXT," +
+                                    "videoUrlSnapshot TEXT," +
+                                    "imagePathSnapshot TEXT," +
+                                    "noteSnapshot TEXT," +
+                                    "measurementSource TEXT NOT NULL," +
+                                    "completionRule TEXT NOT NULL," +
+                                    "prepareSeconds INTEGER NOT NULL," +
+                                    "restSeconds INTEGER," +
+                                    "transitionSeconds INTEGER," +
+                                    "status TEXT NOT NULL," +
+                                    "startedAt INTEGER," +
+                                    "completedAt INTEGER," +
+                                    "FOREIGN KEY (sessionId) REFERENCES training_session(id) ON DELETE CASCADE," +
+                                    "FOREIGN KEY (sourceProgramExerciseId) REFERENCES program_exercise(id) ON DELETE SET NULL," +
+                                    "FOREIGN KEY (sourceExerciseId) REFERENCES exercise(id) ON DELETE SET NULL)");
+                            db.execSQL("CREATE INDEX index_session_exercise_sessionId ON session_exercise (sessionId)");
+                            db.execSQL("CREATE INDEX index_session_exercise_sourceProgramExerciseId ON session_exercise (sourceProgramExerciseId)");
+                            db.execSQL("CREATE INDEX index_session_exercise_sourceExerciseId ON session_exercise (sourceExerciseId)");
+                            db.execSQL("CREATE UNIQUE INDEX index_session_exercise_sessionId_orderIndex " +
+                                    "ON session_exercise (sessionId, orderIndex)");
+
+                            db.execSQL("CREATE TABLE session_set (" +
+                                    "sessionExerciseId INTEGER NOT NULL," +
+                                    "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+                                    "orderIndex INTEGER NOT NULL," +
+                                    "sourceProgramSetId INTEGER," +
+                                    "type TEXT NOT NULL," +
+                                    "status TEXT NOT NULL," +
+                                    "completionSource TEXT," +
+                                    "targetReps INTEGER," +
+                                    "targetRepsMax INTEGER," +
+                                    "targetWeightKg REAL," +
+                                    "targetDurationMillis INTEGER," +
+                                    "targetDistanceMeters REAL," +
+                                    "actualReps INTEGER," +
+                                    "actualWeightKg REAL," +
+                                    "actualDurationMillis INTEGER," +
+                                    "actualDistanceMeters REAL," +
+                                    "linkedWorkoutId INTEGER," +
+                                    "startedAt INTEGER," +
+                                    "completedAt INTEGER," +
+                                    "FOREIGN KEY (sessionExerciseId) REFERENCES session_exercise(id) ON DELETE CASCADE," +
+                                    "FOREIGN KEY (sourceProgramSetId) REFERENCES program_set(id) ON DELETE SET NULL," +
+                                    "FOREIGN KEY (linkedWorkoutId) REFERENCES workout(id) ON DELETE SET NULL)");
+                            db.execSQL("CREATE INDEX index_session_set_sessionExerciseId ON session_set (sessionExerciseId)");
+                            db.execSQL("CREATE INDEX index_session_set_sourceProgramSetId ON session_set (sourceProgramSetId)");
+                            db.execSQL("CREATE INDEX index_session_set_linkedWorkoutId ON session_set (linkedWorkoutId)");
+                            db.execSQL("CREATE UNIQUE INDEX index_session_set_sessionExerciseId_orderIndex " +
+                                    "ON session_set (sessionExerciseId, orderIndex)");
+
+                            db.setTransactionSuccessful();
+                        } finally {
+                            db.endTransaction();
+                        }
+                    }
+                }, new Migration(22, 23) {
+                    @Override
+                    public void migrate(@NonNull SupportSQLiteDatabase db) {
+                        db.execSQL("ALTER TABLE training_session " +
+                                "ADD COLUMN accumulatedPausedMillis INTEGER NOT NULL DEFAULT 0");
+                    }
+                }, new Migration(23, 24) {
+                    @Override
+                    public void migrate(@NonNull SupportSQLiteDatabase db) {
+                        db.execSQL("CREATE TABLE IF NOT EXISTS program_occurrence_summary (" +
+                                "dayId INTEGER NOT NULL," +
+                                "occurrenceDate INTEGER NOT NULL," +
+                                "summaryWorkoutId INTEGER NOT NULL," +
+                                "PRIMARY KEY (dayId, occurrenceDate)," +
+                                "FOREIGN KEY (dayId) REFERENCES program_day(id) ON DELETE CASCADE," +
+                                "FOREIGN KEY (summaryWorkoutId) REFERENCES workout(id) ON DELETE CASCADE)");
+                        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS " +
+                                "index_program_occurrence_summary_summaryWorkoutId " +
+                                "ON program_occurrence_summary (summaryWorkoutId)");
+                    }
+                }, new Migration(24, 25) {
+                    @Override
+                    public void migrate(@NonNull SupportSQLiteDatabase db) {
+                        db.execSQL("ALTER TABLE exercise ADD COLUMN met REAL");
+                        db.execSQL("ALTER TABLE exercise ADD COLUMN secondsPerRep REAL");
+                    }
+                }, new Migration(25, 26) {
+                    @Override
+                    public void migrate(@NonNull SupportSQLiteDatabase db) {
+                        db.execSQL("ALTER TABLE training_program ADD COLUMN icon TEXT");
+                        db.execSQL("ALTER TABLE workout ADD COLUMN programUuid TEXT");
+                        db.execSQL("ALTER TABLE workout ADD COLUMN programName TEXT");
+                        db.execSQL("ALTER TABLE workout ADD COLUMN iconOverride TEXT");
+                    }
+                }, new Migration(26, 27) {
+                    @Override
+                    public void migrate(@NonNull SupportSQLiteDatabase db) {
+                        // SharedPreferences cannot be read from a Room Migration. The
+                        // idempotent repository bootstrap inserts their legacy weight
+                        // and step length immediately after the database opens.
+                        db.execSQL("CREATE TABLE fitness_profile (" +
+                                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+                                "uuid TEXT NOT NULL," +
+                                "name TEXT NOT NULL," +
+                                "isActive INTEGER NOT NULL," +
+                                "birthDateEpochDay INTEGER," +
+                                "heightCm REAL," +
+                                "weightKg REAL," +
+                                "stepLengthCm REAL," +
+                                "gender TEXT," +
+                                "fitnessLevel TEXT," +
+                                "notes TEXT," +
+                                "customAttributesJson TEXT," +
+                                "createdAt INTEGER NOT NULL," +
+                                "updatedAt INTEGER NOT NULL)");
+                        db.execSQL("CREATE UNIQUE INDEX index_fitness_profile_uuid " +
+                                "ON fitness_profile (uuid)");
+                        db.execSQL("CREATE INDEX index_fitness_profile_isActive " +
+                                "ON fitness_profile (isActive)");
+                    }
+                }, new Migration(27, 28) {
+                    @Override
+                    public void migrate(@NonNull SupportSQLiteDatabase db) {
+                        // Nullable snapshots keep every pre-v28 row valid. New rows capture
+                        // identity and measurements once, so later profile edits cannot
+                        // rewrite historical calories or distance assumptions.
+                        db.execSQL("ALTER TABLE training_session ADD COLUMN profileUuidSnapshot TEXT");
+                        db.execSQL("ALTER TABLE training_session ADD COLUMN userWeightKgSnapshot REAL");
+                        db.execSQL("ALTER TABLE training_session ADD COLUMN stepLengthMetersSnapshot REAL");
+                        db.execSQL("ALTER TABLE program_completion ADD COLUMN profileUuidSnapshot TEXT");
+                        db.execSQL("ALTER TABLE program_completion ADD COLUMN userWeightKgSnapshot REAL");
+                        db.execSQL("ALTER TABLE workout ADD COLUMN profileUuid TEXT");
+                        db.execSQL("ALTER TABLE workout ADD COLUMN userWeightKgSnapshot REAL");
+                        db.execSQL("ALTER TABLE workout ADD COLUMN stepLengthMetersSnapshot REAL");
+                        db.execSQL("CREATE INDEX index_workout_profileUuid ON workout (profileUuid)");
                     }
                 })
                 .allowMainThreadQueries()

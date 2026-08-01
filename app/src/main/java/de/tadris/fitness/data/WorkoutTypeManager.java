@@ -34,6 +34,7 @@ public class WorkoutTypeManager {
 
 
     public static final String WORKOUT_TYPE_ID_OTHER = "other";
+    public static final String WORKOUT_TYPE_ID_PROGRAM_TRAINING = "program_training";
     public static final String WORKOUT_TYPE_ID_RUNNING = "running";
     public static final String WORKOUT_TYPE_ID_WALKING = "walking";
     public static final String WORKOUT_TYPE_ID_HIKING = "hiking";
@@ -61,7 +62,7 @@ public class WorkoutTypeManager {
         return instance;
     }
 
-    public WorkoutType getWorkoutTypeById(Context context, String id) {
+    public synchronized WorkoutType getWorkoutTypeById(Context context, String id) {
         buildPresets(context);
 
         WorkoutType retType = null;
@@ -88,7 +89,7 @@ public class WorkoutTypeManager {
         return retType;
     }
 
-    public List<WorkoutType> getAllTypesSorted(Context context) {
+    public synchronized List<WorkoutType> getAllTypesSorted(Context context) {
         List<WorkoutType> list = getAllTypes(context);
         AppDatabase db = Instance.getInstance(context).db;
         Collections.sort(list, (o1, o2) -> -Long.compare(db.getLastWorkoutTimeByType(o1.id), db.getLastWorkoutTimeByType(o2.id)));
@@ -96,10 +97,17 @@ public class WorkoutTypeManager {
         return list;
     }
 
-    public List<WorkoutType> getAllTypes(Context context) {
+    public synchronized List<WorkoutType> getAllTypes(Context context) {
         buildPresets(context);
         checkForNewTypes(context);
         return new ArrayList<>(allWorkoutTypes); // Return clone to avoid tampering from outside...
+    }
+
+    /** Rebuilds built-ins and custom rows after backup replacement/merge. */
+    public synchronized void reloadCustomTypes(Context context) {
+        allWorkoutTypes.clear();
+        buildPresets(context);
+        checkForNewTypes(context);
     }
 
     private List<WorkoutType> checkForNewTypes(Context context) {
@@ -175,6 +183,13 @@ public class WorkoutTypeManager {
                         context.getResources().getColor(R.color.colorPrimary),
                         Icon.OTHER.name,
                         0, RecordingType.GPS.id),
+                new WorkoutType(WORKOUT_TYPE_ID_PROGRAM_TRAINING,
+                        context.getString(R.string.workoutTypeProgramTraining),
+                        1,
+                        context.getResources().getColor(R.color.colorPrimary),
+                        Icon.ACTIVITY.name,
+                        5, RecordingType.INDOOR.id,
+                        R.plurals.workoutRepetition),
                 new WorkoutType(WORKOUT_TYPE_ID_TREADMILL,
                         context.getString(R.string.workoutTypeTreadmill),
                         5,

@@ -24,44 +24,62 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SmallFloatingActionButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import de.tadris.fitness.R
 import de.tadris.fitness.data.WorkoutType
-import de.tadris.fitness.util.Icon
+import de.tadris.fitness.data.WorkoutTypeManager
+import de.tadris.fitness.util.Icon as WorkoutIcon
 
 @Composable
 internal fun DashboardFab(
     expanded: Boolean,
     lastWorkoutType: WorkoutType?,
+    lastWorkoutLabel: String?,
+    lastWorkoutIcon: String?,
+    lastWorkoutProgramUuid: String?,
     onToggle: () -> Unit,
     onRecord: () -> Unit,
     onRecordLast: (WorkoutType) -> Unit,
+    onOpenActiveProgram: (String?) -> Unit,
     onEnterWorkout: () -> Unit,
     onImport: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Column(horizontalAlignment = Alignment.End) {
+    val cornerRadius by animateDpAsState(
+        targetValue = if (expanded) 28.dp else 16.dp,
+        label = "dashboard_fab_corner",
+    )
+
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.End,
+    ) {
         AnimatedVisibility(
             visible = expanded,
-            enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
-            exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 }),
+            enter = fadeIn() + slideInVertically(initialOffsetY = { it / 3 }),
+            exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 3 }),
         ) {
             Column(
                 horizontalAlignment = Alignment.End,
@@ -70,9 +88,15 @@ internal fun DashboardFab(
             ) {
                 if (lastWorkoutType != null) {
                     FabAction(
-                        label = lastWorkoutType.title,
-                        iconRes = Icon.getIcon(lastWorkoutType.icon),
-                        onClick = { onRecordLast(lastWorkoutType) },
+                        label = lastWorkoutLabel ?: lastWorkoutType.title,
+                        iconRes = WorkoutIcon.getIcon(lastWorkoutIcon ?: lastWorkoutType.icon),
+                        onClick = {
+                            if (lastWorkoutType.id == WorkoutTypeManager.WORKOUT_TYPE_ID_PROGRAM_TRAINING) {
+                                onOpenActiveProgram(lastWorkoutProgramUuid)
+                            } else {
+                                onRecordLast(lastWorkoutType)
+                            }
+                        },
                     )
                 }
                 FabAction(
@@ -93,10 +117,17 @@ internal fun DashboardFab(
             }
         }
 
-        FloatingActionButton(onClick = onToggle) {
+        FloatingActionButton(
+            onClick = onToggle,
+            shape = RoundedCornerShape(cornerRadius),
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+        ) {
             Icon(
                 imageVector = if (expanded) Icons.Default.Close else Icons.Default.Add,
-                contentDescription = null,
+                contentDescription = stringResource(
+                    if (expanded) R.string.closeWorkoutActions else R.string.moreWorkoutActions
+                ),
             )
         }
     }
@@ -108,26 +139,20 @@ private fun FabAction(
     iconRes: Int,
     onClick: () -> Unit,
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Surface(
-            shape = MaterialTheme.shapes.small,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            shadowElevation = 2.dp,
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            )
-        }
-        SmallFloatingActionButton(onClick = onClick) {
+    ExtendedFloatingActionButton(
+        modifier = Modifier.semantics {
+            contentDescription = label
+        },
+        onClick = onClick,
+        icon = {
             Icon(
                 painter = painterResource(iconRes),
-                contentDescription = label,
+                contentDescription = null,
             )
-        }
-    }
+        },
+        text = { Text(label) },
+        shape = CircleShape,
+        containerColor = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    )
 }

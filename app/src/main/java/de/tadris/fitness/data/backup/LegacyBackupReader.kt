@@ -28,6 +28,8 @@ import de.tadris.fitness.R
 import de.tadris.fitness.data.AppDatabase
 import de.tadris.fitness.data.BaseSample
 import de.tadris.fitness.data.HeartRateSample
+import de.tadris.fitness.data.Interval
+import de.tadris.fitness.data.IntervalSet
 import de.tadris.fitness.data.RepetitionSample
 import de.tadris.fitness.data.RouteSample
 import de.tadris.fitness.data.Workout
@@ -50,6 +52,10 @@ class LegacyBackupReader(
 ) {
     private var dataContainer: LegacyDataContainer? = null
     private val database: AppDatabase = Instance.getInstance(context).db
+    private val gpsWorkoutIdMap = mutableMapOf<Long, Long>()
+    private val indoorWorkoutIdMap = mutableMapOf<Long, Long>()
+    private val intervalSetIdMap = mutableMapOf<Long, Long>()
+    private val workoutTypeIdMap = mutableMapOf<String, String>()
 
     companion object {
         const val VERSION: Int = 3
@@ -102,7 +108,17 @@ class LegacyBackupReader(
             if (replace) {
                 resetDatabase()
             }
+            gpsWorkoutIdMap.clear()
+            indoorWorkoutIdMap.clear()
+            intervalSetIdMap.clear()
+            workoutTypeIdMap.clear()
             val restoredWorkouts = mutableListOf<Long>()
+            listener.onStatusChanged(30, context.getString(R.string.customWorkoutTypesTitle))
+            restoreWorkoutTypes()
+            // Workouts reference interval-set ids, so collision-safe remapping must
+            // be known before either GPS or indoor rows are inserted.
+            listener.onStatusChanged(35, context.getString(R.string.intervalSets))
+            restoreIntervalSets()
             listener.onStatusChanged(40, context.getString(R.string.workoutRecordingTypeGps))
             restoreGpsWorkouts().also { restoredWorkouts.addAll(it) }
             listener.onStatusChanged(50, context.getString(R.string.locationData))
@@ -111,10 +127,6 @@ class LegacyBackupReader(
             restoreIndoorWorkouts().also { restoredWorkouts.addAll(it) }
             listener.onStatusChanged(85, context.getString(R.string.workoutRecordingTypeIndoor))
             restoreIndoorSamples()
-            listener.onStatusChanged(90, context.getString(R.string.intervalSets))
-            restoreIntervalSets()
-            listener.onStatusChanged(95, context.getString(R.string.customWorkoutTypesTitle))
-            restoreWorkoutTypes()
             listener.onStatusChanged(98, context.getString(R.string.runningMigrations))
             migratePauses(restoredWorkouts)
         }
@@ -128,10 +140,9 @@ class LegacyBackupReader(
         val importedWorkouts = mutableListOf<Long>()
         if (dataContainer!!.workouts != null) {
             for (workout in dataContainer!!.workouts) {
-                // Only Import Unknown Workouts on merge
-                if (replace || database.workoutDao().findById(workout.id) == null) {
-                    database.workoutDao().insertWorkout(Workout(
-                        id = workout.id,
+                val targetId = allocateLegacyWorkoutId(workout.id)
+                database.workoutDao().insertWorkout(Workout(
+                        id = targetId,
                         uuid = UUID.randomUUID().toString(),
                         start = workout.start,
                         end = workout.end,
@@ -140,11 +151,13 @@ class LegacyBackupReader(
                         distance = workout.length.toDouble(),
                         repetitions = 0,
                         energy = workout.calorie * 4184.0, // kcal -> joule
-                        workoutTypeId = workout.workoutTypeId,
-                        intervalSetUsedId = workout.intervalSetUsedId,
-                    ))
-                    importedWorkouts.add(workout.id)
-                }
+                        workoutTypeId = workoutTypeIdMap[workout.workoutTypeId]
+                            ?: workout.workoutTypeId,
+                        intervalSetUsedId = intervalSetIdMap[workout.intervalSetUsedId]
+                            ?: workout.intervalSetUsedId,
+                ))
+                gpsWorkoutIdMap[workout.id] = targetId
+                importedWorkouts.add(targetId)
             }
         }
         return importedWorkouts
@@ -153,42 +166,37 @@ class LegacyBackupReader(
     private fun restoreGpsSamples() {
         if (dataContainer!!.samples != null) {
             for (sample in dataContainer!!.samples) {
-                // Only import unknown samples with known workout on merge
-                // Query not necessary on replace because data was cleared
-                if (replace || (database.workoutDao().findById(sample.workoutId) != null &&
-                            database.workoutDao().findSampleById(sample.id) == null)
-                ) {
-                    database.workoutDao().insertSample(RouteSample(
-                        workoutId = sample.workoutId,
-                        id = sample.id,
+                val targetWorkoutId = gpsWorkoutIdMap[sample.workoutId] ?: continue
+                database.workoutDao().insertSample(RouteSample(
+                    workoutId = targetWorkoutId,
+                    id = 0,
+                    timestamp = sample.absoluteTime,
+                    relativeTime = sample.relativeTime,
+                    latitude = sample.lat,
+                    longitude = sample.lon,
+                    elevation = sample.elevation,
+                    elevationMSL = sample.elevationMSL,
+                    speed = sample.speed,
+                    pressure = sample.pressure,
+                ))
+
+                if (sample.intervalTriggered > 0) {
+                    database.workoutDao().insertWorkoutEvent(WorkoutEvent(
+                        workoutId = targetWorkoutId,
+                        id = 0,
                         timestamp = sample.absoluteTime,
                         relativeTime = sample.relativeTime,
-                        latitude = sample.lat,
-                        longitude = sample.lon,
-                        elevation = sample.elevation,
-                        elevationMSL = sample.elevationMSL,
-                        speed = sample.speed,
-                        pressure = sample.pressure,
+                        typeId = WorkoutEvent.TYPE_ID_INTERVAL,
                     ))
-
-                    if(sample.intervalTriggered > 0){
-                        database.workoutDao().insertWorkoutEvent(WorkoutEvent(
-                            workoutId = sample.workoutId,
-                            id = sample.id,
-                            timestamp = sample.absoluteTime,
-                            relativeTime = sample.relativeTime,
-                            typeId = WorkoutEvent.TYPE_ID_INTERVAL
-                        ))
-                    }
-                    if(sample.heartRate > 0){
-                        database.workoutDao().insertSample(HeartRateSample(
-                            workoutId = sample.workoutId,
-                            id = sample.id,
-                            timestamp = sample.absoluteTime,
-                            relativeTime = sample.relativeTime,
-                            heartRate = sample.heartRate
-                        ))
-                    }
+                }
+                if (sample.heartRate > 0) {
+                    database.workoutDao().insertSample(HeartRateSample(
+                        workoutId = targetWorkoutId,
+                        id = 0,
+                        timestamp = sample.absoluteTime,
+                        relativeTime = sample.relativeTime,
+                        heartRate = sample.heartRate,
+                    ))
                 }
             }
         }
@@ -198,10 +206,9 @@ class LegacyBackupReader(
         val importedWorkouts = mutableListOf<Long>()
         if (dataContainer!!.indoorWorkouts != null) {
             for (workout in dataContainer!!.indoorWorkouts) {
-                // Only Import Unknown Workouts on merge
-                if (replace || database.workoutDao().findById(workout.id) == null) {
-                    database.workoutDao().insertWorkout(Workout(
-                        id = workout.id,
+                val targetId = allocateLegacyWorkoutId(workout.id)
+                database.workoutDao().insertWorkout(Workout(
+                        id = targetId,
                         uuid = UUID.randomUUID().toString(),
                         start = workout.start,
                         end = workout.end,
@@ -210,11 +217,13 @@ class LegacyBackupReader(
                         distance = 0.0,
                         repetitions = workout.repetitions,
                         energy = workout.calorie * 4184.0, // kcal -> joule
-                        workoutTypeId = workout.workoutTypeId,
-                        intervalSetUsedId = workout.intervalSetUsedId,
-                    ))
-                    importedWorkouts.add(workout.id)
-                }
+                        workoutTypeId = workoutTypeIdMap[workout.workoutTypeId]
+                            ?: workout.workoutTypeId,
+                        intervalSetUsedId = intervalSetIdMap[workout.intervalSetUsedId]
+                            ?: workout.intervalSetUsedId,
+                ))
+                indoorWorkoutIdMap[workout.id] = targetId
+                importedWorkouts.add(targetId)
             }
         }
         return importedWorkouts
@@ -223,53 +232,54 @@ class LegacyBackupReader(
     private fun restoreIndoorSamples() {
         if (dataContainer!!.indoorSamples != null) {
             for (sample in dataContainer!!.indoorSamples) {
-                // Only import unknown samples with known workout on merge
-                // Query not necessary on replace because data was cleared
-                if (replace || (database.workoutDao().findById(sample.workoutId) != null &&
-                            database.workoutDao().findSampleById(sample.id) == null)
-                ) {
-                    val workout = database.workoutDao().findById(sample.workoutId)
-                        ?: throw IllegalStateException("Cannot import indoor sample ${sample.id} as workout ${sample.workoutId} was not found")
+                val targetWorkoutId = indoorWorkoutIdMap[sample.workoutId] ?: continue
+                val workout = database.workoutDao().findById(targetWorkoutId)
+                    ?: throw IllegalStateException(
+                        "Cannot import indoor sample ${sample.id} as workout $targetWorkoutId was not found"
+                    )
 
-                    val repetitionTypeId = when(workout.workoutTypeId){
-                        WorkoutTypeManager.WORKOUT_TYPE_ID_TREADMILL -> RepetitionSample.REPETITION_TYPE_STEP
-                        WorkoutTypeManager.WORKOUT_TYPE_ID_ROPE_SKIPPING,
-                        WorkoutTypeManager.WORKOUT_TYPE_ID_TRAMPOLINE_JUMPING -> RepetitionSample.REPETITION_TYPE_JUMP
-                        WorkoutTypeManager.WORKOUT_TYPE_ID_PUSH_UPS -> RepetitionSample.REPETITION_TYPE_PUSH_UP
-                        WorkoutTypeManager.WORKOUT_TYPE_ID_PULL_UPS -> RepetitionSample.REPETITION_TYPE_PULL_UP
-                        else -> RepetitionSample.REPETITION_TYPE_UNKNOWN
-                    }
+                val repetitionTypeId = when (workout.workoutTypeId) {
+                    WorkoutTypeManager.WORKOUT_TYPE_ID_TREADMILL ->
+                        RepetitionSample.REPETITION_TYPE_STEP
+                    WorkoutTypeManager.WORKOUT_TYPE_ID_ROPE_SKIPPING,
+                    WorkoutTypeManager.WORKOUT_TYPE_ID_TRAMPOLINE_JUMPING ->
+                        RepetitionSample.REPETITION_TYPE_JUMP
+                    WorkoutTypeManager.WORKOUT_TYPE_ID_PUSH_UPS ->
+                        RepetitionSample.REPETITION_TYPE_PUSH_UP
+                    WorkoutTypeManager.WORKOUT_TYPE_ID_PULL_UPS ->
+                        RepetitionSample.REPETITION_TYPE_PULL_UP
+                    else -> RepetitionSample.REPETITION_TYPE_UNKNOWN
+                }
 
-                    database.workoutDao().insertSample(RepetitionSample(
-                        workoutId = sample.workoutId,
-                        id = sample.id,
+                database.workoutDao().insertSample(RepetitionSample(
+                    workoutId = targetWorkoutId,
+                    id = 0,
+                    timestamp = sample.absoluteTime,
+                    relativeTime = sample.relativeTime,
+                    repetitionTypeId = repetitionTypeId,
+                    timestampEnd = sample.absoluteEndTime,
+                    repetitions = sample.repetitions,
+                    intensity = sample.intensity,
+                    frequency = sample.frequency,
+                ))
+
+                if (sample.intervalTriggered > 0) {
+                    database.workoutDao().insertWorkoutEvent(WorkoutEvent(
+                        workoutId = targetWorkoutId,
+                        id = 0,
                         timestamp = sample.absoluteTime,
                         relativeTime = sample.relativeTime,
-                        repetitionTypeId = repetitionTypeId,
-                        timestampEnd = sample.absoluteEndTime,
-                        repetitions = sample.repetitions,
-                        intensity = sample.intensity,
-                        frequency = sample.frequency,
+                        typeId = WorkoutEvent.TYPE_ID_INTERVAL,
                     ))
-
-                    if(sample.intervalTriggered > 0){
-                        database.workoutDao().insertWorkoutEvent(WorkoutEvent(
-                            workoutId = sample.workoutId,
-                            id = sample.id,
-                            timestamp = sample.absoluteTime,
-                            relativeTime = sample.relativeTime,
-                            typeId = WorkoutEvent.TYPE_ID_INTERVAL
-                        ))
-                    }
-                    if(sample.heartRate > 0){
-                        database.workoutDao().insertSample(HeartRateSample(
-                            workoutId = sample.workoutId,
-                            id = sample.id,
-                            timestamp = sample.absoluteTime,
-                            relativeTime = sample.relativeTime,
-                            heartRate = sample.heartRate
-                        ))
-                    }
+                }
+                if (sample.heartRate > 0) {
+                    database.workoutDao().insertSample(HeartRateSample(
+                        workoutId = targetWorkoutId,
+                        id = 0,
+                        timestamp = sample.absoluteTime,
+                        relativeTime = sample.relativeTime,
+                        heartRate = sample.heartRate,
+                    ))
                 }
             }
         }
@@ -284,28 +294,71 @@ class LegacyBackupReader(
     }
 
     private fun restoreIntervalSet(container: IntervalSetContainer) {
-        val set = container.set
-        // Only Import unknownInterval Sets
-        if (database.intervalDao().getSet(set.id) == null) {
-            database.intervalDao().insertIntervalSet(set)
+        val incoming = container.set
+        val targetSetId = if (database.intervalDao().getSet(incoming.id) == null) {
+            incoming.id
+        } else {
+            firstAvailableBackupEntityId(
+                seed = maxOf(System.currentTimeMillis(), incoming.id.safeLegacyIncrement()),
+                isOccupied = { database.intervalDao().getSet(it) != null },
+            )
         }
+        database.intervalDao().insertIntervalSet(
+            IntervalSet().also {
+                it.id = targetSetId
+                it.name = incoming.name
+                it.state = incoming.state
+            }
+        )
+        intervalSetIdMap[incoming.id] = targetSetId
         if (container.intervals != null) {
-            for (interval in container.intervals) {
-                // Only Import Unknown Intervals
-                if (database.intervalDao().findById(interval.id) == null) {
-                    database.intervalDao().insertInterval(interval)
+            for (incomingInterval in container.intervals) {
+                val targetIntervalId = if (database.intervalDao().findById(incomingInterval.id) == null) {
+                    incomingInterval.id
+                } else {
+                    firstAvailableBackupEntityId(
+                        seed = maxOf(System.currentTimeMillis(), incomingInterval.id.safeLegacyIncrement()),
+                        isOccupied = { database.intervalDao().findById(it) != null },
+                    )
                 }
+                database.intervalDao().insertInterval(
+                    Interval().also {
+                        it.id = targetIntervalId
+                        it.setId = targetSetId
+                        it.name = incomingInterval.name
+                        it.delayMillis = incomingInterval.delayMillis
+                    }
+                )
             }
         }
     }
 
+    private fun allocateLegacyWorkoutId(importedId: Long): Long =
+        if (database.workoutDao().findById(importedId) == null) {
+            importedId
+        } else {
+            firstAvailableBackupEntityId(
+                seed = maxOf(System.currentTimeMillis(), importedId.safeLegacyIncrement()),
+                isOccupied = { database.workoutDao().findById(it) != null },
+            )
+        }
+
     private fun restoreWorkoutTypes() {
         if (dataContainer!!.workoutTypes != null) {
             for (type in dataContainer!!.workoutTypes) {
-                // Only import unknown workout types
-                if (database.workoutTypeDao().findById(type.id) == null) {
-                    database.workoutTypeDao().insert(type)
+                val existing = database.workoutTypeDao().findById(type.id)
+                val targetId = when {
+                    existing == null && type.id !in BUILT_IN_WORKOUT_TYPE_IDS -> type.id
+                    workoutTypesEquivalent(existing, type) -> type.id
+                    else -> uniqueImportedWorkoutTypeId(type.id) { candidate ->
+                        database.workoutTypeDao().findById(candidate) != null ||
+                            candidate in BUILT_IN_WORKOUT_TYPE_IDS
+                    }
                 }
+                if (database.workoutTypeDao().findById(targetId) == null) {
+                    database.workoutTypeDao().insert(copyWorkoutTypeWithId(type, targetId))
+                }
+                workoutTypeIdMap[type.id] = targetId
             }
         }
     }
@@ -346,3 +399,5 @@ class LegacyBackupReader(
 
     internal class UnsupportedVersionException(message: String?) : Exception(message)
 }
+
+private fun Long.safeLegacyIncrement(): Long = if (this in 1 until Long.MAX_VALUE) this + 1 else 1L

@@ -229,9 +229,25 @@ public class SectionListModel {
             return dist;
         }
 
+        public double getAscent() {
+            return ascent;
+        }
+
+        public double getDescent() {
+            return descent;
+        }
+
         public double getTime(){ return getTime(false);}
 
         public double getTime(boolean millis){ return millis ? time: time / 1000;}
+
+        public boolean isBest() {
+            return best;
+        }
+
+        public boolean isWorst() {
+            return worst;
+        }
 
         public Section copy() {
             Section section = new Section();

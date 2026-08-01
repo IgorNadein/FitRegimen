@@ -83,7 +83,7 @@ class ShareWorkoutViewModel(
                     val workout = dao.getWorkoutById(workoutId)
                         ?: return@withContext ShareWorkoutUiState.Error("Workout not found")
                     val data = WorkoutData.fromWorkout(dao, workout)
-                    val workoutType = workout.getWorkoutType(getApplication())
+                    val workoutType = workout.getDisplayWorkoutType(getApplication())
                     ShareWorkoutUiState.Ready(
                         ShareWorkoutFormState(
                             workout = workout,

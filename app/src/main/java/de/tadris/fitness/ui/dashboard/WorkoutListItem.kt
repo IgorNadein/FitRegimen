@@ -51,8 +51,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import de.tadris.fitness.Instance
+import de.tadris.fitness.R
 import de.tadris.fitness.data.Workout
 import de.tadris.fitness.data.WorkoutType
+import de.tadris.fitness.data.WorkoutTypeManager
 import de.tadris.fitness.ui.theme.FitoTrackTheme
 import de.tadris.fitness.ui.theme.spacing
 import de.tadris.fitness.util.Icon
@@ -67,13 +69,23 @@ internal fun WorkoutListItem(
     val context = LocalContext.current
     val instance = Instance.getInstance(context)
     val workoutType = workout.getWorkoutType(context)
+    val displayWorkoutType = workout.getDisplayWorkoutType(context)
+    val displayComment = workout.comment
+        ?.removePrefix("${workout.programName} · ")
+        ?.takeUnless { it == workout.programName }
 
     val dateText = instance.userDateTimeUtils.formatDateTime(Date(workout.start))
-    val distanceText = if (workout.distance == 0.0 && workout.repetitions > 0) {
-        val reps = workout.repetitions
-        "$reps ${LocalResources.current.getQuantityString(workoutType.repeatingExerciseName, reps)}"
-    } else {
-        instance.distanceUnitUtils.getDistance(workout.distance.toInt())
+    val distanceText = when {
+        workout.workoutTypeId == WorkoutTypeManager.WORKOUT_TYPE_ID_PROGRAM_TRAINING &&
+            workout.distance <= 0.0 && workout.repetitions <= 0 ->
+            LocalResources.current.getString(R.string.guided_history_completed)
+
+        workout.distance == 0.0 && workout.repetitions > 0 -> {
+            val reps = workout.repetitions
+            "$reps ${LocalResources.current.getQuantityString(workoutType.repeatingExerciseName, reps)}"
+        }
+
+        else -> instance.distanceUnitUtils.getDistance(workout.distance.toInt())
     }
     val durationText = instance.distanceUnitUtils.getHourMinuteTime(workout.activeDuration)
 
@@ -87,7 +99,7 @@ internal fun WorkoutListItem(
             modifier = Modifier.padding(MaterialTheme.spacing.defaultFull),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            WorkoutListIcon(workoutType)
+            WorkoutListIcon(displayWorkoutType)
             Spacer(modifier = Modifier.width(MaterialTheme.spacing.defaultFull))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -101,11 +113,11 @@ internal fun WorkoutListItem(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = workoutType.title,
+                        text = displayWorkoutType.title,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    val comment = workout.comment
+                    val comment = displayComment
                     if (comment != null) {
                         Spacer(Modifier.padding(MaterialTheme.spacing.defaultFull))
                         Text(

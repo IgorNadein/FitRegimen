@@ -37,9 +37,11 @@ public class StatisticsAdapter extends FragmentStateAdapter {
 
     ArrayList<Fragment> fragments;
     FitoTrackActivity context;
+    private final FragmentManager fragmentManager;
 
     public StatisticsAdapter(FragmentManager fragmentManager, Lifecycle lifecycle, FitoTrackActivity context) {
         super(fragmentManager, lifecycle);
+        this.fragmentManager = fragmentManager;
         this.context = context;
         fragments = new ArrayList<>(Arrays.asList(
                 new StatsOverviewFragment(),
@@ -65,5 +67,35 @@ public class StatisticsAdapter extends FragmentStateAdapter {
             list.add(statsFragment.getTitle(context));
         }
         return list;
+    }
+
+    /**
+     * Compose disposes the AndroidView whenever the statistics destination leaves
+     * composition. Explicitly remove the adapter fragments so a later instance
+     * cannot collide with the fixed FragmentStateAdapter tags (f0/f1).
+     */
+    public void dispose() {
+        removeStaleFragments(fragmentManager);
+        fragments.clear();
+    }
+
+    public static void removeStaleFragments(FragmentManager fragmentManager) {
+        if (fragmentManager.isDestroyed()) {
+            return;
+        }
+        ArrayList<Fragment> stale = new ArrayList<>();
+        for (Fragment fragment : fragmentManager.getFragments()) {
+            if (fragment instanceof StatsFragment) {
+                stale.add(fragment);
+            }
+        }
+        if (stale.isEmpty()) {
+            return;
+        }
+        androidx.fragment.app.FragmentTransaction transaction = fragmentManager.beginTransaction();
+        for (Fragment fragment : stale) {
+            transaction.remove(fragment);
+        }
+        transaction.commitNowAllowingStateLoss();
     }
 }

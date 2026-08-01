@@ -36,10 +36,13 @@ import de.tadris.fitness.R
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    showNavigationIcon: Boolean = true,
+    onNavigateToFitnessProfiles: () -> Unit = {},
     onNavigateToInterfaceSettings: () -> Unit = {},
     onNavigateToRecordingSettings: () -> Unit = {},
     onNavigateToBackupSettings: () -> Unit = {},
     onNavigateToWorkoutTypes: () -> Unit = {},
+    onNavigateToExercises: () -> Unit = {},
     onNavigateToDebugSettings: () -> Unit = {},
     onNavigateToAbout: () -> Unit = {},
 ) {
@@ -48,17 +51,26 @@ fun SettingsScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.settings)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = null,
-                        )
+                    if (showNavigationIcon) {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.actionBack),
+                            )
+                        }
                     }
                 },
             )
         },
     ) { padding ->
         LazyColumn(contentPadding = padding) {
+            item {
+                ClickableSettingsItem(
+                    title = stringResource(R.string.fitness_profiles_title),
+                    supporting = stringResource(R.string.fitness_profiles_summary),
+                    onClick = onNavigateToFitnessProfiles,
+                )
+            }
             item {
                 ClickableSettingsItem(
                     title = stringResource(R.string.preferencesUserInterfaceTitle),
@@ -77,6 +89,13 @@ fun SettingsScreen(
                 ClickableSettingsItem(
                     title = stringResource(R.string.customWorkoutTypesTitle),
                     onClick = onNavigateToWorkoutTypes,
+                )
+            }
+            item {
+                ClickableSettingsItem(
+                    title = stringResource(R.string.customExercisesTitle),
+                    supporting = stringResource(R.string.customExercisesSummary),
+                    onClick = onNavigateToExercises,
                 )
             }
             item {

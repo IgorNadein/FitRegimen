@@ -26,20 +26,107 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
 /**
- * Maps calendar dates to a [TrainingProgram]'s repeating cycle. Shared by the schedule
- * screen and the "link a recorded workout to a program task" flow so both agree on which
- * day of the cycle a given date falls on.
+ * Maps calendar dates to a finite [TrainingProgram] timeline. The ordered
+ * [ProgramDay] rows are the complete schedule from its first through last day.
  */
 object ProgramScheduling {
 
-    /** Returns the 0-based day-of-cycle for [date], or null if the program hasn't been started. */
-    fun dayIndexOf(program: TrainingProgram, date: LocalDate, zone: ZoneId): Int? {
+    data class DateBounds(
+        val first: LocalDate,
+        val last: LocalDate,
+    ) {
+        fun clamp(date: LocalDate): LocalDate = when {
+            date.isBefore(first) -> first
+            date.isAfter(last) -> last
+            else -> date
+        }
+    }
+
+    /** Returns the 0-based scheduled day, or null before day 1 / after the last day. */
+    fun dayIndexOf(program: TrainingProgram, dayCount: Int, date: LocalDate, zone: ZoneId): Int? =
+        boundedDayIndexOf(program, dayCount, date, zone)
+
+    /**
+     * Calendar bounds of the concrete days displayed by the program. The strip and
+     * every completion/link lookup use these same finite boundaries.
+     */
+    fun firstScheduleBounds(
+        program: TrainingProgram,
+        dayCount: Int,
+        zone: ZoneId,
+    ): DateBounds? {
         val startDate = program.startDate ?: return null
-        if (program.cycleLengthDays <= 0) return null
-        val startLocalDate = Instant.ofEpochMilli(startDate).atZone(zone).toLocalDate()
-        val daysSinceStart = ChronoUnit.DAYS.between(startLocalDate, date)
-        val cycleLength = program.cycleLengthDays.toLong()
-        return (((daysSinceStart % cycleLength) + cycleLength) % cycleLength).toInt()
+        if (dayCount <= 0) return null
+        val first = Instant.ofEpochMilli(startDate).atZone(zone).toLocalDate()
+        return DateBounds(
+            first = first,
+            last = first.plusDays(dayCount.toLong() - 1L),
+        )
+    }
+
+    /** A non-repeating index for the bounded date strip; dates outside it are absent. */
+    fun boundedDayIndexOf(
+        program: TrainingProgram,
+        dayCount: Int,
+        date: LocalDate,
+        zone: ZoneId,
+    ): Int? {
+        val bounds = firstScheduleBounds(program, dayCount, zone) ?: return null
+        if (date.isBefore(bounds.first) || date.isAfter(bounds.last)) return null
+        return ChronoUnit.DAYS.between(bounds.first, date).toInt()
+    }
+
+    fun hasEnded(
+        program: TrainingProgram,
+        dayCount: Int,
+        date: LocalDate,
+        zone: ZoneId,
+    ): Boolean = firstScheduleBounds(program, dayCount, zone)
+        ?.let { date.isAfter(it.last) }
+        ?: false
+
+    /**
+     * The single definition used by both the Programs tab and shortcuts that
+     * need to open an unfinished program. An empty timeline cannot be followed.
+     */
+    fun isActive(
+        program: TrainingProgram,
+        dayCount: Int,
+        date: LocalDate,
+        zone: ZoneId,
+    ): Boolean = program.startDate != null &&
+        dayCount > 0 &&
+        !hasEnded(program, dayCount, date, zone)
+
+    /** Preserves the caller's order, which is the same order shown in the Programs tab. */
+    fun firstActiveProgram(
+        programs: List<TrainingProgram>,
+        dayCountsByProgramId: Map<Long, Int>,
+        date: LocalDate,
+        zone: ZoneId,
+    ): TrainingProgram? = programs.firstOrNull { program ->
+        isActive(
+            program = program,
+            dayCount = dayCountsByProgramId[program.id] ?: 0,
+            date = date,
+            zone = zone,
+        )
+    }
+
+    /**
+     * First item of a fixed-size viewport. The selected day is centered whenever
+     * both program edges leave enough room, otherwise the window hugs that edge.
+     */
+    fun dateStripWindowStart(
+        selectedIndex: Int,
+        dayCount: Int,
+        visibleDayCount: Int = 7,
+    ): Int {
+        if (dayCount <= 0) return 0
+        val safeVisibleCount = visibleDayCount.coerceAtLeast(1)
+        val safeSelectedIndex = selectedIndex.coerceIn(0, dayCount - 1)
+        val maxStart = (dayCount - safeVisibleCount).coerceAtLeast(0)
+        return (safeSelectedIndex - safeVisibleCount / 2).coerceIn(0, maxStart)
     }
 
     /** Epoch ms of midnight of [date] in [zone] - the canonical [ProgramCompletion.occurrenceDate]. */

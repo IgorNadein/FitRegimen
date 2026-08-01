@@ -25,11 +25,11 @@ import androidx.room.PrimaryKey
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 
 /**
- * A user-defined, repeating training program: a cycle of [cycleLengthDays] days,
- * each holding zero or more [ProgramTask]s. A day with no tasks is a rest day.
+ * A user-defined, finite training program. Its ordered [ProgramDay] rows are the
+ * complete timeline, so the day count is also the program duration in days.
  *
- * @property startDate epoch ms of day 0 of the first cycle. Null means the program
- * is just a template the user authored/imported but hasn't started following yet.
+ * @property startDate epoch ms of midnight of program day 1. Null means
+ * the program is a plan/template the user hasn't started following yet.
  */
 @Entity(tableName = "training_program")
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -39,7 +39,8 @@ data class TrainingProgram(
     val uuid: String,
     val name: String,
     val description: String? = null,
-    val cycleLengthDays: Int,
     val startDate: Long? = null,
     val createdAt: Long,
+    /** Logical name of an app-provided icon; null uses the generic program icon. */
+    val icon: String? = null,
 )

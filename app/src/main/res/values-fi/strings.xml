@@ -353,7 +353,6 @@
     <string name="deleteIntervalSet">Poista välijoukko</string>
     <string name="selectIntervalSet">Valitse välijoukko</string>
     <string name="aboutTitle">Tietoja</string>
-    <string name="aboutChangelog">Muutosloki</string>
     <string name="deleteWorkoutType">Poista treenityyppi</string>
     <string name="actionCancelDownload">Peruuta lataus</string>
     <string name="preferencesUserInterfaceSummary">Mukauta sovellusta</string>

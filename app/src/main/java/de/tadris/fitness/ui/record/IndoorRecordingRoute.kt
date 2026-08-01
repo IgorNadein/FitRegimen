@@ -48,7 +48,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
-import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -65,6 +64,9 @@ import de.tadris.fitness.Instance
 import de.tadris.fitness.R
 import de.tadris.fitness.data.RecordingType
 import de.tadris.fitness.data.WorkoutTypeManager
+import de.tadris.fitness.recording.RecordingState
+import de.tadris.fitness.recording.StopReason
+import de.tadris.fitness.recording.event.RecordingStateChangeEvent
 import de.tadris.fitness.util.NotificationHelper
 import de.tadris.fitness.util.unit.UnitUtils
 
@@ -75,9 +77,49 @@ fun IndoorRecordingRoute(
     onFinish: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToIntervalSets: () -> Unit,
+    onWorkoutFinished: (RecordedWorkoutResult?) -> Unit = {},
+    autoStopGoal: RecordingAutoStopGoal? = null,
 ) {
     val context = LocalContext.current
     val vm: IndoorRecordingViewModel = viewModel()
+    val workoutDao = remember { Instance.getInstance(context).db.workoutDao() }
+    val eventAtRouteEntry = remember { RecordingStateChangeEvent.getCurrent() }
+    var finishResultDelivered by remember { mutableStateOf(false) }
+    var autoStopTriggered by remember(autoStopGoal) { mutableStateOf(false) }
+    val recordingState by vm.recordingState.collectAsState()
+    val recordingValues by vm.values.collectAsState()
+
+    LaunchedEffect(autoStopGoal, recordingState, recordingValues) {
+        val goal = autoStopGoal ?: return@LaunchedEffect
+        if (
+            !autoStopTriggered &&
+            recordingState == RecordingState.RUNNING &&
+            recordingValues.currentState == RecordingState.RUNNING &&
+            goal.isReached(
+                activeDurationMillis = recordingValues.activeDuration,
+                recordedDistanceMeters = recordingValues.distance,
+                recordedRepetitions = recordingValues.repetitions,
+            )
+        ) {
+            autoStopTriggered = true
+            vm.stop(StopReason.AUTO_STOP)
+        }
+    }
+
+    val finishWithResult: () -> Unit = {
+        if (!finishResultDelivered) {
+            finishResultDelivered = true
+            val finishEvent = RecordingStateChangeEvent.getCurrent()
+            val belongsToThisRoute = finishEvent != eventAtRouteEntry
+            val result = if (belongsToThisRoute) {
+                RecordedWorkoutResultResolver.resolve(finishEvent, workoutDao)
+            } else {
+                null
+            }
+            onWorkoutFinished(result)
+            onFinish()
+        }
+    }
 
     val workoutType = remember(workoutTypeId) {
         WorkoutTypeManager.getInstance().getWorkoutTypeById(context, workoutTypeId)
@@ -122,36 +164,55 @@ fun IndoorRecordingRoute(
         )
     }
 
-    // Bluetooth device chooser
-    val showChooseBluetoothDevice by vm.showChooseBluetoothDevice.collectAsState()
-    LaunchedEffect(showChooseBluetoothDevice) {
-        if (!showChooseBluetoothDevice) return@LaunchedEffect
-        val activity = context as? Activity
-        try {
-            activity?.let {
-                ChooseBluetoothDeviceDialog(it) { device -> vm.onBtDeviceSelected(device) }.show()
-            }
-        } catch (_: ChooseBluetoothDeviceDialog.BluetoothNotAvailableException) {
-            activity?.startActivity(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
-        }
-        vm.dismissChooseBluetoothDevice()
+    // Bluetooth permission + Material device chooser
+    var bluetoothPermissionsGranted by remember {
+        mutableStateOf(hasBluetoothPickerPermissions(context))
+    }
+    val bluetoothPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        bluetoothPermissionsGranted = hasBluetoothPickerPermissions(context)
+        if (!bluetoothPermissionsGranted) vm.dismissChooseBluetoothDevice()
     }
 
-    // Info slot selection dialog
+    val showChooseBluetoothDevice by vm.showChooseBluetoothDevice.collectAsState()
+    LaunchedEffect(showChooseBluetoothDevice, bluetoothPermissionsGranted) {
+        if (showChooseBluetoothDevice && !bluetoothPermissionsGranted &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+        ) {
+            bluetoothPermissionLauncher.launch(
+                arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
+            )
+        }
+    }
+    if (showChooseBluetoothDevice && bluetoothPermissionsGranted) {
+        BluetoothDevicePickerSheet(
+            onDismiss = vm::dismissChooseBluetoothDevice,
+            onBluetoothUnavailable = {
+                vm.dismissChooseBluetoothDevice()
+                runCatching {
+                    context.startActivity(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+                }
+            },
+            onDeviceSelected = vm::onBtDeviceSelected,
+        )
+    }
+
+    // Info slot selection sheet
     val selectInfoSlot by vm.selectInfoDialogSlot.collectAsState()
-    LaunchedEffect(selectInfoSlot) {
-        val slot = selectInfoSlot ?: return@LaunchedEffect
-        val activity = context as? Activity ?: return@LaunchedEffect
+    selectInfoSlot?.let { slot ->
         val recordingType = RecordingType.findById(workoutType.recordingType)
-        SelectWorkoutInformationDialog(activity, recordingType, slot) { s, info ->
-            vm.onInfoSlotSelected(s, info)
-        }.show()
-        vm.dismissSelectInfoDialog()
+        RecordingInformationPickerSheet(
+            recordingType = recordingType,
+            slot = slot,
+            onDismiss = vm::dismissSelectInfoDialog,
+            onInformationSelected = { info -> vm.onInfoSlotSelected(slot, info) },
+        )
     }
 
     IndoorRecordingScreen(
         vm = vm,
-        onFinish = onFinish,
+        onFinish = finishWithResult,
         onNavigateToSettings = onNavigateToSettings,
         onNavigateToIntervalSets = onNavigateToIntervalSets,
     )
@@ -169,8 +230,8 @@ fun IndoorRecordingScreen(
     val workoutType by vm.currentWorkoutType.collectAsState()
 
     val onBackgroundColor = MaterialTheme.colorScheme.onBackground.toArgb()
-    val frequencyColor = colorResource(R.color.diagramFrequency).toArgb()
-    val intensityColor = colorResource(R.color.diagramIntensity).toArgb()
+    val frequencyColor = MaterialTheme.colorScheme.primary.toArgb()
+    val intensityColor = MaterialTheme.colorScheme.tertiary.toArgb()
     val frequencyLabel = stringResource(R.string.workoutFrequency)
     val intensityLabel = stringResource(R.string.workoutIntensity)
 

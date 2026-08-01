@@ -24,7 +24,6 @@ import android.view.KeyEvent
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,6 +34,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
 import de.tadris.fitness.Instance
+import de.tadris.fitness.R
 import de.tadris.fitness.data.RecordingType
 import de.tadris.fitness.data.WorkoutType
 import de.tadris.fitness.data.WorkoutTypeManager
@@ -48,7 +48,9 @@ import de.tadris.fitness.ui.theme.FitoTrackTheme
 import de.tadris.fitness.util.FitoTrackThemes
 import de.tadris.fitness.util.osm.OAuthAuthentication
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : FitoTrackActivity() {
+
+    override fun getActivityThemeRes(): Int = R.style.AppThemeNoActionbar
 
     companion object {
         const val EXTRA_ROUTE = "extra_route"
@@ -108,10 +110,16 @@ class MainActivity : AppCompatActivity() {
 
         // Handle running workout detected at startup (e.g. app killed while recording)
         val runningWorkout = state.runningWorkout
-        if (runningWorkout != null) {
+        if (runningWorkout != null && isNewLaunch) {
             LaunchedEffect(Unit) {
                 val workoutType = runningWorkout.getWorkoutType(this@MainActivity)
                 navigateToRecord(workoutType, false)
+            }
+        } else if (state.runningTrainingSessionId != null && isNewLaunch) {
+            LaunchedEffect(state.runningTrainingSessionId) {
+                navController.navigate(Route.GuidedWorkout(state.runningTrainingSessionId)) {
+                    launchSingleTop = true
+                }
             }
         }
 
@@ -167,6 +175,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        val instance = Instance.getInstance(this)
+        if (instance.userPreferences.themeSetting == "0") {
+            instance.themes.updateDarkModeSetting()
+        }
         OAuthAuthentication.resetCustomTabState(this)
     }
 

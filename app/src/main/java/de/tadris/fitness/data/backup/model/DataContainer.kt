@@ -26,4 +26,12 @@ data class DataContainer(
     val workoutTypes: List<WorkoutType>,
     // Added in FitRegimen (backup format v5). Defaults to empty so older backups still deserialize.
     val programs: List<ProgramContainer> = emptyList(),
+    // Added in backup format v6. Guided history is separate from mutable program templates.
+    val sessions: List<TrainingSessionExport> = emptyList(),
+    // Added in backup format v7. Profiles are never included in standalone program shares.
+    val profiles: List<FitnessProfileExport> = emptyList(),
+    // Full backup only. Includes hidden and currently unreferenced catalog entries.
+    val exerciseCatalog: List<ExerciseCatalogExport> = emptyList(),
+    // Full backup only. Null means the source backup predates portable settings.
+    val preferences: PortablePreferencesExport? = null,
 )

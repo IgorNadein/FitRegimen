@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Neutral FitRegimen activity mark. Kept in vector form for crisp tinted UI icons. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M20,73 C7,59 7,36 20,20 C34,3 60,1 78,15"
+        android:strokeColor="@android:color/white"
+        android:strokeLineCap="round"
+        android:strokeWidth="6" />
+
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M82,73 C89,66 93,56 93,45"
+        android:strokeColor="@android:color/white"
+        android:strokeLineCap="round"
+        android:strokeWidth="6" />
+
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M49,20 A7,7 0,1 1,49,34 A7,7 0,1 1,49,20" />
+
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M25,33 C33,40 41,45 49,45 C57,45 65,40 73,33 C75,31 78,34 75,37 L62,48 C57,52 57,55 61,60 C65,65 68,73 70,83 L62,83 C59,73 54,64 49,60 C44,64 39,73 36,83 L28,83 C30,73 33,65 37,60 C41,55 41,52 36,48 L23,37 C20,34 23,31 25,33 Z" />
+</vector>

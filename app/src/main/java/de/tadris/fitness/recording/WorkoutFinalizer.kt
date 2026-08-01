@@ -25,6 +25,7 @@ import android.util.Log
 import de.tadris.fitness.data.CalculatedValues
 import de.tadris.fitness.data.WorkoutDao
 import de.tadris.fitness.data.WorkoutData
+import de.tadris.fitness.data.effectiveMeasurements
 import de.tadris.fitness.data.autoexport.AutoExportPlanner
 import de.tadris.fitness.data.calorie.CalorieCalculator
 import de.tadris.fitness.data.preferences.UserMeasurements
@@ -154,12 +155,17 @@ class WorkoutFinalizer(val context: Context, val workoutDao: WorkoutDao, val wor
         return activeDuration
     }
 
-    private fun getEnergy() = CalorieCalculator(context).calculateEnergy(
-        UserMeasurements.from(context),
-        getActiveDuration(),
-        calculatedValues.getAscentAndDescent().first.roundToInt(),
-        workout.workoutTypeId,
-        data.samples.totalDistance / (getActiveDuration() / 1000.0)
-    )
+    private fun getEnergy(): Double {
+        val current = UserMeasurements.from(context)
+        val effective = workout.effectiveMeasurements(current)
+        return CalorieCalculator(context).calculateEnergy(
+            measurements = effective.asUserMeasurements(),
+            userWeightKg = effective.weightKg,
+            duration = getActiveDuration(),
+            ascent = calculatedValues.getAscentAndDescent().first.roundToInt(),
+            workoutTypeId = workout.workoutTypeId,
+            speed = data.samples.totalDistance / (getActiveDuration() / 1000.0),
+        )
+    }
 
 }

@@ -187,7 +187,6 @@
     <string name="speedLastMinute">Середня швидкісь (остання хвилина)</string>
     <string name="speedLastMinuteSpoken">Швидкість за останню хвилину</string>
     <string name="announcementSuppressDuringCall">Вимкнути під час дзвінка</string>
-    <string name="aboutChangelog">Журнал змін</string>
     <string name="aboutOpenSourceLibraries">Бібліотеки з відкритим вихідним кодом</string>
     <string name="aboutReportBug">Повідомити про помилку</string>
     <string name="aboutLinks">Посилання</string>

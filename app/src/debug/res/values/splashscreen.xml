@@ -22,11 +22,15 @@
      <style name="Theme.App.Starting" parent="Theme.SplashScreen">
         <!-- Set the splash screen background, animated icon, and animation
         duration. -->
-        <item name="windowSplashScreenBackground">@color/colorPrimaryDebug</item>
+        <item name="windowSplashScreenBackground">@color/colorBrandOrange</item>
+        <item name="android:statusBarColor">@color/colorBrandOrange</item>
+        <item name="android:navigationBarColor">@color/colorBrandOrange</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
 
         <!-- Use windowSplashScreenAnimatedIcon to add a drawable or an animated
              drawable. One of these is required. -->
-        <item name="windowSplashScreenAnimatedIcon">@drawable/logo_combined</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/logo_foreground</item>
         <!-- Required for animated icons. -->
         <item name="windowSplashScreenAnimationDuration">100</item>
 

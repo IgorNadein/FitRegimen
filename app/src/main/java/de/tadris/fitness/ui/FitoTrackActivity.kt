@@ -24,6 +24,7 @@ import android.os.Bundle
 import android.view.MenuItem
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.AttrRes
+import androidx.annotation.StyleRes
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
 import de.tadris.fitness.Instance
@@ -32,9 +33,15 @@ import de.tadris.fitness.util.ThemeUtils
 
 abstract class FitoTrackActivity : AppCompatActivity() {
 
+    @StyleRes
+    protected open fun getActivityThemeRes(): Int =
+        Instance.getInstance(this).themes.defaultTheme
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        // AppCompat decides whether an ActionBar exists while creating its
+        // sub-decor. The theme must therefore be selected before super.onCreate.
+        setTheme(getActivityThemeRes())
         super.onCreate(savedInstanceState)
-        setTheme(Instance.getInstance(this).themes.defaultTheme)
         enableEdgeToEdge()
     }
 

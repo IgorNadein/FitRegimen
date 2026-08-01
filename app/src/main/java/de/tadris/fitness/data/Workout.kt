@@ -20,8 +20,10 @@ package de.tadris.fitness.data
 
 import android.content.Context
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.fasterxml.jackson.annotation.JsonIgnore
+import de.tadris.fitness.util.Icon as WorkoutIcon
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -37,8 +39,14 @@ import kotlin.math.min
  * @property distance Distance in meters
  * @property energy Energy in joules
  * @property workoutTypeId Type of workout
+ * @property programUuid Portable identity of the source program, captured at completion
+ * @property programName Display name of the source program, captured at completion
+ * @property iconOverride Logical icon name captured from the source program
  */
-@Entity(tableName = "workout")
+@Entity(
+    tableName = "workout",
+    indices = [Index("profileUuid")],
+)
 data class Workout(
     @PrimaryKey
     val id: Long,
@@ -52,6 +60,12 @@ data class Workout(
     val energy: Double,
     val workoutTypeId: String,
     val intervalSetUsedId: Long,
+    val programUuid: String? = null,
+    val programName: String? = null,
+    val iconOverride: String? = null,
+    val profileUuid: String? = null,
+    val userWeightKgSnapshot: Double? = null,
+    val stepLengthMetersSnapshot: Double? = null,
 ) {
 
     val kcal get() = energy / 4186.8
@@ -115,6 +129,36 @@ data class Workout(
     @JsonIgnore
     fun getWorkoutType(context: Context?): WorkoutType {
         return WorkoutTypeManager.getInstance().getWorkoutTypeById(context, workoutTypeId)
+    }
+
+    /**
+     * Program summaries keep the base recording type for compatibility, but their
+     * visible identity belongs to the concrete program that produced them.
+     */
+    @JsonIgnore
+    fun getDisplayWorkoutType(context: Context?): WorkoutType {
+        val base = getWorkoutType(context)
+        val sourceUuid = programUuid?.takeIf { it.isNotBlank() } ?: return base
+        return WorkoutType(
+            "program:$sourceUuid",
+            programName?.takeIf { it.isNotBlank() } ?: base.title,
+            base.minDistance,
+            base.color,
+            getDisplayIconName(context),
+            base.MET,
+            base.recordingType,
+            base.repeatingExerciseName,
+        )
+    }
+
+    @JsonIgnore
+    fun getDisplayIconName(context: Context?): String {
+        val validOverride = iconOverride?.let { persisted ->
+            WorkoutIcon.values().firstOrNull { it.name == persisted }?.name
+        }
+        return validOverride
+            ?: if (!programUuid.isNullOrBlank()) WorkoutIcon.ACTIVITY.name
+            else getWorkoutType(context).icon
     }
 
 }

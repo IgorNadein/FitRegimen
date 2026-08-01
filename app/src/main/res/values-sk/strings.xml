@@ -325,7 +325,6 @@
 \n
 \nNapr. ak vyberiete \"týždeň\", všetky cvičenia v týždňovom časovom rozpätí budú zlúčené do jedného bodu buď s výpočtom priemeru alebo súčtu každého týždňa.</string>
     <string name="workoutImported">Cvičenie úspešne importované</string>
-    <string name="aboutChangelog">Zoznam zmien</string>
     <string name="aboutOpenSourceLibraries">Open source knižnice</string>
     <string name="editDisplayedInformationHint">Pokiaľ cvičenie nezačalo, môžete upraviť zobrazené hodnoty kliknutím na jedno zo štyroch polí.</string>
     <string name="recordingActivityPermissionMessage">FitoTrack potrebuje povolenie ku sledovaniu vašej fyzickej aktivity, aby mohol zaznamenávať cvičenie v interiéri.</string>

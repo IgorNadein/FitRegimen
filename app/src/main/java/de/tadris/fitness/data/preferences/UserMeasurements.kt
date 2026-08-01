@@ -33,7 +33,10 @@ data class UserMeasurements(
 
     companion object {
 
-        val DEFAULT = UserMeasurements(80, 0.8f) // e.g. for testing
+        val DEFAULT = UserMeasurements(
+            UserPreferences.DEFAULT_USER_WEIGHT_KG,
+            UserPreferences.DEFAULT_STEP_LENGTH_METERS,
+        ) // e.g. for testing
 
         @JvmStatic
         fun from(context: Context) = Instance.getInstance(context).userPreferences.measurements

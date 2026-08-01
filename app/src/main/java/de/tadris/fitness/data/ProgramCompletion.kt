@@ -30,21 +30,21 @@ const val PROGRAM_COMPLETION_STATUS_COMPLETED = 1
 const val PROGRAM_COMPLETION_STATUS_SKIPPED = 2
 
 /**
- * Records the outcome of one occurrence of a [ProgramTask] (identified by
- * [occurrenceDate], the calendar date that cycle iteration fell on). Rows are only
- * created when the user actually acts on an occurrence - future/untouched occurrences
- * are computed on the fly from the program's schedule, not pre-populated here.
+ * The outcome of one occurrence of a [ProgramExercise] (identified by
+ * [occurrenceDate], midnight of that scheduled program date).
+ * Rows are created lazily when the user acts - untouched occurrences are computed
+ * on the fly from the program's schedule.
  *
- * [workoutId] links to the actual recorded [Workout] that fulfilled this task, if any;
- * null with [status] == SKIPPED means the user explicitly marked it as skipped.
+ * Performed strength sets optionally hang off this row as [SetLog] children.
+ * For recordable (cardio) exercises, [workoutId] links the actual recorded [Workout].
  */
 @Entity(
     tableName = "program_completion",
     foreignKeys = [
         ForeignKey(
-            entity = ProgramTask::class,
+            entity = ProgramExercise::class,
             parentColumns = ["id"],
-            childColumns = ["programTaskId"],
+            childColumns = ["programExerciseId"],
             onDelete = ForeignKey.CASCADE
         ),
         ForeignKey(
@@ -55,16 +55,19 @@ const val PROGRAM_COMPLETION_STATUS_SKIPPED = 2
         )
     ],
     indices = [
-        Index("programTaskId"),
+        Index(value = ["programExerciseId", "occurrenceDate"], unique = true),
         Index("workoutId")
     ]
 )
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class ProgramCompletion(
-    val programTaskId: Long,
+    val programExerciseId: Long,
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val occurrenceDate: Long,
-    val workoutId: Long? = null,
     val status: Int,
+    val workoutId: Long? = null,
+    val completedAt: Long = 0,
+    val profileUuidSnapshot: String? = null,
+    val userWeightKgSnapshot: Double? = null,
 )

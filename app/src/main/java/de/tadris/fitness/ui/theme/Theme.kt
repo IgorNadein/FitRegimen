@@ -18,6 +18,8 @@
  */
 
 package de.tadris.fitness.ui.theme
+
+import android.content.SharedPreferences
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -26,8 +28,12 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import de.tadris.fitness.Instance
@@ -277,9 +283,23 @@ fun FitoTrackTheme(
     content: @Composable() () -> Unit
 ) {
   val context = LocalContext.current
-  val prefs = remember { Instance.getInstance(context).userPreferences }
-  val themeSetting = remember { prefs.themeSetting }
-  val useSystemColors = remember { prefs.useSystemColors }
+  val prefs = remember(context) { Instance.getInstance(context).userPreferences }
+  var themeSetting by remember(prefs) { mutableStateOf(prefs.themeSetting) }
+  var useSystemColors by remember(prefs) { mutableStateOf(prefs.useSystemColors) }
+
+  DisposableEffect(prefs.preferences) {
+      val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+          when (key) {
+              "themeSetting" -> themeSetting = prefs.themeSetting
+              "useSystemColors" -> useSystemColors = prefs.useSystemColors
+          }
+      }
+      prefs.preferences.registerOnSharedPreferenceChangeListener(listener)
+      onDispose {
+          prefs.preferences.unregisterOnSharedPreferenceChangeListener(listener)
+      }
+  }
+
   val darkTheme = when (themeSetting) {
       "1" -> true
       "2" -> false
@@ -298,6 +318,7 @@ fun FitoTrackTheme(
   MaterialTheme(
     colorScheme = colorScheme,
     typography = AppTypography,
+    shapes = AppShapes,
     content = content
   )
 }

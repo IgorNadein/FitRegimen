@@ -25,7 +25,9 @@ import androidx.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import de.tadris.fitness.Instance;
 import de.tadris.fitness.data.Workout;
@@ -59,7 +61,8 @@ public class StatsDataProvider {
 
     public ArrayList<StatsDataTypes.DataPoint> getData(WorkoutProperty requestedProperty, List<WorkoutType> workoutTypes, @Nullable StatsDataTypes.TimeSpan timeSpan) {
         ArrayList<StatsDataTypes.DataPoint> data = new ArrayList<>();
-        List<Workout> workouts = Instance.getInstance(context).db.workoutDao().getWorkouts();
+        Map<String, WorkoutType> programDisplayTypes = new HashMap<>();
+        List<Workout> workouts = Instance.getInstance(context).db.workoutDao().getVisibleWorkouts();
         for (Workout workout : workouts) {
             if ((timeSpan == null) || timeSpan.contains(workout.getStart())) {
                 WorkoutType type = workout.getWorkoutType(context);
@@ -67,7 +70,16 @@ public class StatsDataProvider {
                     // check if property can provide data for workout
                     try {
                         double val = getPropertyValue(requestedProperty, workout);
-                        data.add(new StatsDataTypes.DataPoint(type, workout.getId(), workout.getStart(), val));
+                        WorkoutType displayType = type;
+                        String programUuid = workout.getProgramUuid();
+                        if (programUuid != null && !programUuid.trim().isEmpty()) {
+                            displayType = programDisplayTypes.get(programUuid);
+                            if (displayType == null) {
+                                displayType = workout.getDisplayWorkoutType(context);
+                                programDisplayTypes.put(programUuid, displayType);
+                            }
+                        }
+                        data.add(new StatsDataTypes.DataPoint(displayType, workout.getId(), workout.getStart(), val));
                     } catch (Exception e) {
                         // This should never happen, cause it is checked by the if clauses above
                         e.printStackTrace();

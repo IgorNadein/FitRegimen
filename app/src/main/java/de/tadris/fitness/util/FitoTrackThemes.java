@@ -19,7 +19,6 @@
 
 package de.tadris.fitness.util;
 
-import android.app.UiModeManager;
 import android.content.Context;
 import android.preference.PreferenceManager;
 
@@ -30,10 +29,9 @@ import de.tadris.fitness.R;
 
 public class FitoTrackThemes {
 
-    private static final int THEME_SETTING_AUTO = 0;
+    private static final int THEME_SETTING_SYSTEM = 0;
     private static final int THEME_SETTING_LIGHT = 2;
     private static final int THEME_SETTING_DARK = 1;
-
     private final Context context;
 
     public FitoTrackThemes(Context context) {
@@ -47,29 +45,35 @@ public class FitoTrackThemes {
 
     public void updateDarkModeSetting() {
         int themeSetting = getThemeSetting();
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            UiModeManager uiModeManager = (UiModeManager) context.getSystemService(Context.UI_MODE_SERVICE);
-            int uiMode = UiModeManager.MODE_NIGHT_AUTO;
-            if (themeSetting == THEME_SETTING_LIGHT) {
-                uiMode = UiModeManager.MODE_NIGHT_NO;
-            } else if (themeSetting == THEME_SETTING_DARK) {
-                uiMode = UiModeManager.MODE_NIGHT_YES;
-            }
-            uiModeManager.setApplicationNightMode(uiMode);
-        } else {
-            int mode = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM;
-            if (themeSetting == THEME_SETTING_LIGHT) {
-                mode = AppCompatDelegate.MODE_NIGHT_NO;
-            } else if (themeSetting == THEME_SETTING_DARK) {
-                mode = AppCompatDelegate.MODE_NIGHT_YES;
-            }
+        int mode = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM;
+        if (themeSetting == THEME_SETTING_LIGHT) {
+            mode = AppCompatDelegate.MODE_NIGHT_NO;
+        } else if (themeSetting == THEME_SETTING_DARK) {
+            mode = AppCompatDelegate.MODE_NIGHT_YES;
+        }
+        if (AppCompatDelegate.getDefaultNightMode() != mode) {
             AppCompatDelegate.setDefaultNightMode(mode);
         }
     }
 
     private int getThemeSetting() {
-        String setting = PreferenceManager.getDefaultSharedPreferences(context).getString("themeSetting", String.valueOf(THEME_SETTING_LIGHT));
-        return Integer.parseInt(setting);
+        String setting = PreferenceManager.getDefaultSharedPreferences(context).getString(
+                "themeSetting",
+                String.valueOf(THEME_SETTING_SYSTEM)
+        );
+        if (setting != null) {
+            try {
+                int value = Integer.parseInt(setting);
+                if (value == THEME_SETTING_SYSTEM
+                        || value == THEME_SETTING_LIGHT
+                        || value == THEME_SETTING_DARK) {
+                    return value;
+                }
+            } catch (NumberFormatException ignored) {
+                // Fall through to the safe default.
+            }
+        }
+        return THEME_SETTING_SYSTEM;
     }
 
 }

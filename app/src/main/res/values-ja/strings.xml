@@ -316,7 +316,6 @@
     <string name="downloadSuccess">ダウンロード済み</string>
     <string name="downloadFailed">ダウンロード失敗</string>
     <string name="currentTimeStructure">%s %s</string>
-    <string name="aboutChangelog">変更履歴</string>
     <string name="aboutOpenSourceLibraries">オープンソースライブラリ</string>
     <string name="aboutReportBug">バグを報告する</string>
     <string name="aboutLinks">リンク</string>

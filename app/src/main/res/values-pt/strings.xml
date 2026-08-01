@@ -280,7 +280,6 @@
     <string name="recordingStateRunning">Execucao</string>
     <string name="recordingStateIdle">Ocioso</string>
     <string name="speechConfigNoSpeech">Sem Anúncio</string>
-    <string name="aboutChangelog">Alteracao</string>
     <string name="announcementSuppressDuringCall">Suprimir durante a chamada</string>
     <string name="dayInMonth">Dia no Mês</string>
     <string name="preferencesBackupSummary">Backup/Restaurar dados de exercícios</string>

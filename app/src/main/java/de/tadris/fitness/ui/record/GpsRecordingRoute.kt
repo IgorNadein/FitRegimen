@@ -22,7 +22,6 @@ import android.Manifest
 import android.app.Activity
 import android.bluetooth.BluetoothAdapter
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -48,12 +47,14 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.app.ActivityCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.tadris.fitness.Instance
 import de.tadris.fitness.R
 import de.tadris.fitness.data.RecordingType
 import de.tadris.fitness.data.WorkoutTypeManager
+import de.tadris.fitness.recording.RecordingState
+import de.tadris.fitness.recording.StopReason
+import de.tadris.fitness.recording.event.RecordingStateChangeEvent
 import de.tadris.fitness.recording.autostart.AutoStartMode
 import de.tadris.fitness.util.NotificationHelper
 
@@ -64,9 +65,49 @@ fun GpsRecordingRoute(
     onFinish: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToIntervalSets: () -> Unit,
+    onWorkoutFinished: (RecordedWorkoutResult?) -> Unit = {},
+    autoStopGoal: RecordingAutoStopGoal? = null,
 ) {
     val context = LocalContext.current
     val vm: GpsRecordingViewModel = viewModel()
+    val workoutDao = remember { Instance.getInstance(context).db.workoutDao() }
+    val eventAtRouteEntry = remember { RecordingStateChangeEvent.getCurrent() }
+    var finishResultDelivered by remember { mutableStateOf(false) }
+    var autoStopTriggered by remember(autoStopGoal) { mutableStateOf(false) }
+    val recordingState by vm.recordingState.collectAsState()
+    val recordingValues by vm.values.collectAsState()
+
+    LaunchedEffect(autoStopGoal, recordingState, recordingValues) {
+        val goal = autoStopGoal ?: return@LaunchedEffect
+        if (
+            !autoStopTriggered &&
+            recordingState == RecordingState.RUNNING &&
+            recordingValues.currentState == RecordingState.RUNNING &&
+            goal.isReached(
+                activeDurationMillis = recordingValues.activeDuration,
+                recordedDistanceMeters = recordingValues.distance,
+                recordedRepetitions = recordingValues.repetitions,
+            )
+        ) {
+            autoStopTriggered = true
+            vm.stop(StopReason.AUTO_STOP)
+        }
+    }
+
+    val finishWithResult: () -> Unit = {
+        if (!finishResultDelivered) {
+            finishResultDelivered = true
+            val finishEvent = RecordingStateChangeEvent.getCurrent()
+            val belongsToThisRoute = finishEvent != eventAtRouteEntry
+            val result = if (belongsToThisRoute) {
+                RecordedWorkoutResultResolver.resolve(finishEvent, workoutDao)
+            } else {
+                null
+            }
+            onWorkoutFinished(result)
+            onFinish()
+        }
+    }
 
     val workoutType = remember(workoutTypeId) {
         WorkoutTypeManager.getInstance().getWorkoutTypeById(context, workoutTypeId)
@@ -136,47 +177,54 @@ fun GpsRecordingRoute(
     }
 
     // Bluetooth permission + device chooser
+    var bluetoothPermissionsGranted by remember {
+        mutableStateOf(hasBluetoothPickerPermissions(context))
+    }
     val btPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { _ -> /* user can re-tap Bluetooth after granting */ }
+    ) {
+        bluetoothPermissionsGranted = hasBluetoothPickerPermissions(context)
+        if (!bluetoothPermissionsGranted) vm.dismissChooseBluetoothDevice()
+    }
 
     val showChooseBluetoothDevice by vm.showChooseBluetoothDevice.collectAsState()
-    LaunchedEffect(showChooseBluetoothDevice) {
-        if (!showChooseBluetoothDevice) return@LaunchedEffect
-        val activity = context as? Activity
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-            ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+    LaunchedEffect(showChooseBluetoothDevice, bluetoothPermissionsGranted) {
+        if (showChooseBluetoothDevice && !bluetoothPermissionsGranted &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
         ) {
             btPermissionLauncher.launch(
                 arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
             )
-        } else {
-            try {
-                activity?.let {
-                    ChooseBluetoothDeviceDialog(it) { device -> vm.onBtDeviceSelected(device) }.show()
-                }
-            } catch (_: ChooseBluetoothDeviceDialog.BluetoothNotAvailableException) {
-                activity?.startActivity(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
-            }
         }
-        vm.dismissChooseBluetoothDevice()
+    }
+    if (showChooseBluetoothDevice && bluetoothPermissionsGranted) {
+        BluetoothDevicePickerSheet(
+            onDismiss = vm::dismissChooseBluetoothDevice,
+            onBluetoothUnavailable = {
+                vm.dismissChooseBluetoothDevice()
+                runCatching {
+                    context.startActivity(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+                }
+            },
+            onDeviceSelected = vm::onBtDeviceSelected,
+        )
     }
 
-    // Info slot selection dialog
+    // Info slot selection sheet
     val selectInfoSlot by vm.selectInfoDialogSlot.collectAsState()
-    LaunchedEffect(selectInfoSlot) {
-        val slot = selectInfoSlot ?: return@LaunchedEffect
-        val activity = context as? Activity ?: return@LaunchedEffect
+    selectInfoSlot?.let { slot ->
         val recordingType = RecordingType.findById(workoutType.recordingType)
-        SelectWorkoutInformationDialog(activity, recordingType, slot) { s, info ->
-            vm.onInfoSlotSelected(s, info)
-        }.show()
-        vm.dismissSelectInfoDialog()
+        RecordingInformationPickerSheet(
+            recordingType = recordingType,
+            slot = slot,
+            onDismiss = vm::dismissSelectInfoDialog,
+            onInformationSelected = { info -> vm.onInfoSlotSelected(slot, info) },
+        )
     }
 
     GpsRecordingScreen(
         vm = vm,
-        onFinish = onFinish,
+        onFinish = finishWithResult,
         onNavigateToSettings = onNavigateToSettings,
         onNavigateToIntervalSets = onNavigateToIntervalSets,
     )

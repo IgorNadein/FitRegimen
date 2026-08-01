@@ -335,7 +335,6 @@
     <string name="recordingStateIdle">Väntar</string>
     <string name="recordingStateRunning">Pågår</string>
     <string name="aboutOpenSourceLibraries">Bibliotek med öppen källkod</string>
-    <string name="aboutChangelog">Ändringslogg</string>
     <string name="editWorkoutStartEnd">Redigera start/slut</string>
     <string name="speedLastMinute">Snitthastighet (senaste min)</string>
     <string name="no_workouts_recorded">Inga sparade träningspass</string>

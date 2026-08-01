@@ -26,6 +26,7 @@ import androidx.lifecycle.viewModelScope
 import de.tadris.fitness.BuildConfig
 import de.tadris.fitness.Instance
 import de.tadris.fitness.data.Workout
+import de.tadris.fitness.data.ProgramOccurrenceHistoryRepository
 import de.tadris.fitness.data.migration.Migration
 import de.tadris.fitness.data.migration.Migration15DistancePeriod
 import de.tadris.fitness.data.migration.Migration16Energy
@@ -43,7 +44,10 @@ import kotlinx.coroutines.withContext
 sealed interface InitState {
     data object Loading : InitState
     data class Migrating(val progress: Int) : InitState
-    data class Ready(val runningWorkout: Workout?) : InitState
+    data class Ready(
+        val runningWorkout: Workout?,
+        val runningTrainingSessionId: Long?,
+    ) : InitState
     data class Error(val exception: Exception) : InitState
 }
 
@@ -72,17 +76,32 @@ class AppInitializer(application: Application) : AndroidViewModel(application), 
             }
 
             withContext(Dispatchers.IO) {
+                if (preferences.programWorkoutProjectionVersion < PROGRAM_WORKOUT_PROJECTION_VERSION) {
+                    ProgramOccurrenceHistoryRepository(
+                        db = instance.db,
+                        userWeightKg = { preferences.userWeight.toDouble() },
+                        profileSnapshot = {
+                            instance.fitnessProfileRepository.captureActiveSnapshot()
+                        },
+                    ).rebuildAll()
+                    preferences.programWorkoutProjectionVersion = PROGRAM_WORKOUT_PROJECTION_VERSION
+                }
                 preferences.updateLastVersionCode()
                 instance.shortcuts.init()
             }
 
-            val runningWorkout = withContext(Dispatchers.IO) {
+            val (runningWorkout, runningTrainingSessionId) = withContext(Dispatchers.IO) {
                 val workout = instance.db.workoutDao().findRunningWorkout()
                 val recordingState = RecordingStateChangeEvent.getCurrent().newState
-                if (workout != null && recordingState != RecordingState.STOPPED) workout else null
+                val activeWorkout = if (workout != null && recordingState != RecordingState.STOPPED) {
+                    workout
+                } else {
+                    null
+                }
+                activeWorkout to instance.db.trainingSessionDao().getRunningSessions().firstOrNull()?.id
             }
 
-            _state.value = InitState.Ready(runningWorkout)
+            _state.value = InitState.Ready(runningWorkout, runningTrainingSessionId)
         } catch (e: Exception) {
             _state.value = InitState.Error(e)
         }
@@ -109,5 +128,9 @@ class AppInitializer(application: Application) : AndroidViewModel(application), 
 
     override fun onProgressUpdate(progress: Int) {
         _state.value = InitState.Migrating(progress)
+    }
+
+    private companion object {
+        const val PROGRAM_WORKOUT_PROJECTION_VERSION = 2
     }
 }

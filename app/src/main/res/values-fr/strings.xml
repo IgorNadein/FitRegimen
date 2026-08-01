@@ -249,7 +249,6 @@
     <string name="editWorkout">Modifier la séance</string>
     <string name="aboutTitle">À propos</string>
     <string name="aboutVersion">Version</string>
-    <string name="aboutChangelog">Journal des changements</string>
     <string name="aboutOpenSourceLibraries">Librairies Open source</string>
     <string name="aboutReportBug">Signaler une erreur</string>
     <string name="aboutLinks">Liens</string>

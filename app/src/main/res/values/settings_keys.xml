@@ -155,15 +155,16 @@
         <item>joule</item>
     </string-array>
 
-    <string name="urlRepository" translatable="false">https://codeberg.org/jannis/FitoTrack</string>
-    <string name="urlChangelog" translatable="false">https://codeberg.org/jannis/FitoTrack/releases</string>
-    <string name="urlBugReport" translatable="false">https://codeberg.org/jannis/FitoTrack/issues</string>
+    <string name="urlRepository" translatable="false">https://github.com/IgorNadein</string>
+    <string name="urlUpstreamRepository" translatable="false">https://codeberg.org/jannis/FitoTrack</string>
     <string name="urlCopyrightNotices" translatable="false">https://codeberg.org/jannis/FitoTrack/src/branch/master/NOTICE.md</string>
     <string name="urlWeblate" translatable="false">https://hosted.weblate.org/engage/fitotrack/</string>
-    <string name="urlPrivacy" translatable="false">https://codeberg.org/jannis/FitoTrack/src/branch/master/doc/privacy-policy.md</string>
+    <string name="fitRegimenAuthorName" translatable="false">IgorNadein</string>
     <string name="authorName" translatable="false">Jannis Scheibe</string>
     <string name="urlAuthor" translatable="false">https://codeberg.org/jannis</string>
-    <string name="emailAuthor" translatable="false">jannis@tadris.de</string>
+    <string name="emailAuthor" translatable="false">nadein.igor.vladimirovich@gmail.com</string>
+    <string name="emailFeedbackSubject" translatable="false">FitRegimen Feedback</string>
+    <string name="emailBugReportSubject" translatable="false">FitRegimen Bug report</string>
 
     <string name="urlDownloadMaps" translatable="false">https://ftp-stud.hs-esslingen.de/pub/Mirrors/download.mapsforge.org/maps/v5/</string>
 

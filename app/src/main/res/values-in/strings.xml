@@ -320,7 +320,6 @@
     <string name="cannotFindWorkout">Workout tidak ditemukan</string>
     <string name="editWorkout">Ubah Workout</string>
     <string name="editWorkoutStartEnd">Ubah Waktu Mulai/Selesai</string>
-    <string name="aboutChangelog">Catatan perubahan</string>
     <string name="aboutOpenSourceLibraries">Library open source</string>
     <string name="aboutLinks">Tautan</string>
     <string name="aboutUnlistedContributors">Terima kasih kepada semua kontributor yang tidak tercantum yang telah membantu menerjemahkan dan mengembangkan FitoTrack!</string>

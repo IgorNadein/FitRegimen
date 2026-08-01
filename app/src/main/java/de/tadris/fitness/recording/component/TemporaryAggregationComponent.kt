@@ -23,6 +23,7 @@ import android.hardware.SensorManager
 import de.tadris.fitness.data.RouteSample
 import de.tadris.fitness.data.WorkoutData
 import de.tadris.fitness.data.calorie.CalorieCalculator
+import de.tadris.fitness.data.effectiveMeasurements
 import de.tadris.fitness.data.preferences.UserMeasurements
 import de.tadris.fitness.data.preferences.UserPreferences
 import de.tadris.fitness.recording.RecorderService
@@ -211,12 +212,16 @@ class TemporaryAggregationComponent : RecorderServiceComponent {
         val duration = service.stateHolder.currentActiveDuration
         if (duration <= 0) return
         val avgSpeed = distance / (duration / 1000.0)
+        val current = UserMeasurements.from(service)
+        val workout = service.instance.db.workoutDao().findById(service.stateHolder.workoutId)
+        val effective = workout?.effectiveMeasurements(current)
         val calculated = CalorieCalculator(service).calculateEnergy(
-            UserMeasurements.from(service),
-            duration,
-            ascent.toInt(),
-            service.stateHolder.workoutType.id,
-            avgSpeed
+            measurements = effective?.asUserMeasurements() ?: current,
+            userWeightKg = effective?.weightKg ?: current.weight.toDouble(),
+            duration = duration,
+            ascent = ascent.toInt(),
+            workoutTypeId = service.stateHolder.workoutType.id,
+            speed = avgSpeed,
         )
         energy = maxOf(calculated, energy)
     }

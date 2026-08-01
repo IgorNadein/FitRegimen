@@ -24,41 +24,57 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import androidx.room.TypeConverter
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 
+/** Stored as String so later additions (DROPSET, FAILURE...) are no-op migrations. */
+enum class SetType {
+    NORMAL,
+    WARMUP;
+
+    companion object {
+        fun findByName(name: String?): SetType =
+            entries.firstOrNull { it.name == name } ?: NORMAL
+    }
+}
+
+class SetTypeConverter {
+    @TypeConverter
+    fun toStringValue(type: SetType): String = type.name
+
+    @TypeConverter
+    fun fromStringValue(value: String): SetType = SetType.findByName(value)
+}
+
 /**
- * A single planned exercise within a [TrainingProgram]'s cycle, on day [dayIndex]
- * (0-based, wraps every [TrainingProgram.cycleLengthDays]). [workoutTypeId] refers
- * loosely to [WorkoutType.id], same non-enforced reference style [Workout] itself uses.
- * The nullable target fields are filled in as relevant to the workout type - distance/
- * duration for GPS types, sets/reps for indoor rep-based types.
+ * One planned set of a [ProgramExercise]. Columns are uniform and all-nullable;
+ * the exercise's [MetricKind] masks which ones the UI shows and fills, so pyramids
+ * (12/10/8) and rep ranges ([reps]..[repsMax]) are plain rows.
  */
 @Entity(
-    tableName = "program_task",
+    tableName = "program_set",
     foreignKeys = [
         ForeignKey(
-            entity = TrainingProgram::class,
+            entity = ProgramExercise::class,
             parentColumns = ["id"],
-            childColumns = ["programId"],
+            childColumns = ["programExerciseId"],
             onDelete = ForeignKey.CASCADE
         )
     ],
     indices = [
-        Index("programId")
+        Index("programExerciseId")
     ]
 )
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class ProgramTask(
-    val programId: Long,
+data class ProgramSet(
+    val programExerciseId: Long,
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-    val dayIndex: Int,
-    val dayTitle: String? = null,
     val orderIndex: Int,
-    val workoutTypeId: String,
-    val targetSets: Int? = null,
-    val targetReps: Int? = null,
-    val targetDurationMillis: Long? = null,
-    val targetDistanceMeters: Double? = null,
-    val note: String? = null,
+    val type: SetType = SetType.NORMAL,
+    val reps: Int? = null,
+    val repsMax: Int? = null,
+    val weightKg: Double? = null,
+    val durationMillis: Long? = null,
+    val distanceMeters: Double? = null,
 )

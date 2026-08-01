@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.viewinterop.AndroidView
 import com.github.mikephil.charting.charts.BarChart
 import com.github.mikephil.charting.data.BarData
+import com.github.mikephil.charting.data.BarDataSet
 import de.tadris.fitness.Instance
 import de.tadris.fitness.R
 import de.tadris.fitness.data.WorkoutData
@@ -43,6 +44,7 @@ internal fun SpeedHistogram(
     modifier: Modifier = Modifier,
 ) {
     val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
+    val primaryColor = MaterialTheme.colorScheme.primary.toArgb()
     AndroidView(
         factory = { ctx ->
             val chart = BarChart(ctx)
@@ -60,6 +62,7 @@ internal fun SpeedHistogram(
 
                 val dataSet =
                     StatsProvider(ctx).createWeightedHistogramData(values, weights, 15, "")
+                dataSet.color = primaryColor
                 val barData = BarData(dataSet)
                 chart.data = barData
 
@@ -85,6 +88,17 @@ internal fun SpeedHistogram(
                 chart.invalidate()
             }
             chart
+        },
+        update = { chart ->
+            chart.data?.dataSets?.forEach { dataSet ->
+                (dataSet as? BarDataSet)?.color = primaryColor
+            }
+            chart.xAxis.textColor = textColor
+            chart.axisLeft.textColor = textColor
+            chart.axisRight.textColor = textColor
+            chart.description.textColor = textColor
+            chart.legend.textColor = textColor
+            chart.invalidate()
         },
         modifier = modifier,
     )

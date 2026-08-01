@@ -27,11 +27,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -61,9 +63,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
@@ -72,19 +75,18 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import de.tadris.fitness.Instance
 import de.tadris.fitness.R
+import de.tadris.fitness.data.AppDatabase
+import de.tadris.fitness.data.FitnessProfileSnapshot
 import de.tadris.fitness.data.PROGRAM_COMPLETION_STATUS_COMPLETED
-import de.tadris.fitness.data.ProgramCompletion
+import de.tadris.fitness.data.ProgramExercise
+import de.tadris.fitness.data.ProgramOccurrenceHistoryRepository
 import de.tadris.fitness.data.ProgramScheduling
-import de.tadris.fitness.data.ProgramTask
 import de.tadris.fitness.data.TrainingProgram
-import de.tadris.fitness.data.TrainingProgramDao
 import de.tadris.fitness.data.Workout
 import de.tadris.fitness.data.WorkoutTypeManager
+import de.tadris.fitness.data.effectiveMeasurements
 import de.tadris.fitness.data.preferences.UserMeasurements
 import de.tadris.fitness.ui.map.WorkoutMap
-import de.tadris.fitness.ui.sections.SectionListModel
-import de.tadris.fitness.ui.sections.SectionListPresenter
-import de.tadris.fitness.ui.sections.SectionListView
 import de.tadris.fitness.ui.theme.spacing
 import de.tadris.fitness.ui.workout.diagram.FrequencyConverter
 import de.tadris.fitness.ui.workout.diagram.HeartRateConverter
@@ -92,6 +94,7 @@ import de.tadris.fitness.ui.workout.diagram.HeightConverter
 import de.tadris.fitness.ui.workout.diagram.IntensityConverter
 import de.tadris.fitness.ui.workout.diagram.SpeedConverter
 import de.tadris.fitness.ui.workout.diagram.WorkoutDiagram
+import de.tadris.fitness.util.Icon as WorkoutIcon
 import de.tadris.fitness.util.osm.OAuthAuthentication
 import de.tadris.fitness.util.unit.UnitUtils
 import java.time.Instant
@@ -193,9 +196,9 @@ private fun ShowWorkoutContent(
     var showLinkDialog by rememberSaveable { mutableStateOf(false) }
     val gpxExport = rememberGpxExportState(data)
 
-    val trainingProgramDao = remember { instance.db.trainingProgramDao() }
+    val database = remember { instance.db }
     var linkCandidates by remember(workout.id) {
-        mutableStateOf(findProgramLinkCandidates(trainingProgramDao, workout))
+        mutableStateOf(findProgramLinkCandidates(database, workout))
     }
 
     val oauthLauncher = rememberLauncherForActivityResult(
@@ -206,8 +209,26 @@ private fun ShowWorkoutContent(
 
     Scaffold(
         topBar = {
+            val displayType = workout.getDisplayWorkoutType(context)
             TopAppBar(
-                title = { Text(workout.getWorkoutType(context).title) },
+                title = {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            painter = painterResource(WorkoutIcon.getIcon(displayType.icon)),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp),
+                        )
+                        Text(
+                            text = displayType.title,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -339,9 +360,9 @@ private fun ShowWorkoutContent(
                     (state.data.pauses.size + 1).toString()
                 )
                 if (workout.workoutTypeId == WorkoutTypeManager.WORKOUT_TYPE_ID_TREADMILL) {
-                    val measurements = UserMeasurements.from(context)
+                    val measurements = workout.effectiveMeasurements(UserMeasurements.from(context))
                     val estimatedDistance =
-                        (measurements.stepLength * workout.repetitions).roundToInt()
+                        (measurements.stepLengthMeters * workout.repetitions).roundToInt()
                     val estimatedSpeed = estimatedDistance / (workout.activeDuration / 1000.0)
                     KeyValueRow(
                         stringResource(R.string.approxSymbol) + stringResource(R.string.workoutDistance),
@@ -486,15 +507,7 @@ private fun ShowWorkoutContent(
                     onClick = { onShowDiagram(DiagramType.HEIGHT) }
                 )
                 SectionHeader(stringResource(R.string.sections))
-                AndroidView(
-                    factory = { ctx ->
-                        val listView = SectionListView(ctx)
-                        val listModel = SectionListModel(data)
-                        SectionListPresenter(listView, listModel)
-                        listView
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                WorkoutSectionsCard(data = data)
             }
 
             // Intensity
@@ -595,15 +608,21 @@ private fun ShowWorkoutContent(
                 Column {
                     linkCandidates.forEach { candidate ->
                         Text(
-                            text = "${candidate.program.name} · ${
-                                candidate.task.dayTitle?.takeIf { it.isNotBlank() }
-                                    ?: stringResource(R.string.dayNumber, candidate.task.dayIndex + 1)
-                            }",
+                            text = "${candidate.program.name} · ${candidate.exerciseName}",
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    linkWorkoutToTask(trainingProgramDao, workout, candidate)
-                                    linkCandidates = findProgramLinkCandidates(trainingProgramDao, workout)
+                                    linkWorkoutToTask(
+                                        db = database,
+                                        workout = workout,
+                                        candidate = candidate,
+                                        userWeightKg = UserMeasurements.from(context).weight.toDouble(),
+                                        profileSnapshot = {
+                                            Instance.getInstance(context).fitnessProfileRepository
+                                                .captureActiveSnapshot()
+                                        },
+                                    )
+                                    linkCandidates = findProgramLinkCandidates(database, workout)
                                     showLinkDialog = false
                                 }
                                 .padding(vertical = 12.dp)
@@ -628,53 +647,59 @@ private fun ShowWorkoutContent(
     }
 }
 
-/** A program task this workout could retroactively fulfill (FitRegimen). */
+/** A program exercise occurrence this workout could retroactively fulfill (FitRegimen). */
 private data class ProgramLinkCandidate(
     val program: TrainingProgram,
-    val task: ProgramTask,
+    val entry: ProgramExercise,
+    val exerciseName: String,
     val occurrenceDate: Long,
 )
 
 /**
- * Finds program tasks whose scheduled day (per [ProgramScheduling]) falls on [workout]'s
- * own date and whose workout type matches, excluding ones already fulfilled by another
- * workout. Anchored on the workout's date rather than "today" so linking still works for
- * workouts recorded a few days after the fact.
+ * Finds recordable program exercises whose scheduled day (per [ProgramScheduling])
+ * falls on [workout]'s own date and whose linked workout type matches, excluding ones
+ * already fulfilled. Anchored on the workout's date rather than "today" so linking
+ * still works for workouts recorded a few days after the fact.
  */
 private fun findProgramLinkCandidates(
-    dao: TrainingProgramDao,
+    db: AppDatabase,
     workout: Workout,
 ): List<ProgramLinkCandidate> {
+    val dao = db.trainingProgramDao()
+    val exerciseDao = db.exerciseDao()
     val zone = ZoneId.systemDefault()
     val workoutDate = Instant.ofEpochMilli(workout.start).atZone(zone).toLocalDate()
     val candidates = mutableListOf<ProgramLinkCandidate>()
     for (program in dao.getPrograms()) {
-        val dayIndex = ProgramScheduling.dayIndexOf(program, workoutDate, zone) ?: continue
+        val days = dao.getDaysOfProgram(program.id)
+        val dayIndex = ProgramScheduling.dayIndexOf(program, days.size, workoutDate, zone) ?: continue
+        val day = days.getOrNull(dayIndex) ?: continue
         val occurrenceDate = ProgramScheduling.occurrenceMillis(workoutDate, zone)
-        val tasks = dao.getTasksOfProgram(program.id)
-            .filter { it.dayIndex == dayIndex && it.workoutTypeId == workout.workoutTypeId }
-        for (task in tasks) {
-            val existing = dao.findCompletion(task.id, occurrenceDate)
+        for (entry in dao.getExercisesOfDay(day.id)) {
+            val exercise = exerciseDao.findById(entry.exerciseId) ?: continue
+            if (exercise.workoutTypeId != workout.workoutTypeId) continue
+            val existing = dao.findCompletion(entry.id, occurrenceDate)
             if (existing?.status == PROGRAM_COMPLETION_STATUS_COMPLETED) continue
-            candidates.add(ProgramLinkCandidate(program, task, occurrenceDate))
+            candidates.add(ProgramLinkCandidate(program, entry, exercise.name, occurrenceDate))
         }
     }
     return candidates
 }
 
-private fun linkWorkoutToTask(dao: TrainingProgramDao, workout: Workout, candidate: ProgramLinkCandidate) {
-    val existing = dao.findCompletion(candidate.task.id, candidate.occurrenceDate)
-    if (existing != null) {
-        dao.updateCompletion(existing.copy(workoutId = workout.id, status = PROGRAM_COMPLETION_STATUS_COMPLETED))
-    } else {
-        dao.insertCompletion(
-            ProgramCompletion(
-                programTaskId = candidate.task.id,
-                occurrenceDate = candidate.occurrenceDate,
-                workoutId = workout.id,
-                status = PROGRAM_COMPLETION_STATUS_COMPLETED,
-            )
-        )
-    }
+private fun linkWorkoutToTask(
+    db: AppDatabase,
+    workout: Workout,
+    candidate: ProgramLinkCandidate,
+    userWeightKg: Double,
+    profileSnapshot: () -> FitnessProfileSnapshot,
+) {
+    ProgramOccurrenceHistoryRepository(
+        db = db,
+        userWeightKg = { userWeightKg },
+        profileSnapshot = profileSnapshot,
+    ).linkWorkout(
+        candidate.entry.id,
+        candidate.occurrenceDate,
+        workout.id,
+    )
 }
-
