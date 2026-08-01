@@ -17,7 +17,7 @@
   ~     You should have received a copy of the GNU General Public License
   ~     along with this program.  If not, see <http://www.gnu.org/licenses/>.
   --><resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
-    <string name="app_name">FitoTrack</string>
+    <string name="app_name">FitRegimen</string>
     <string name="stop">Остановить</string>
     <string name="delete">Удалить</string>
     <string name="error">Ошибка</string>
@@ -581,4 +581,41 @@
     <string name="recording_gps_accurate">GPS · точно</string>
     <string name="recording_gps_weak">%d спутн. · слабо</string>
     <string name="recording_gps_searching">%d спутн. · поиск</string>
+
+    <!-- Training programs (FitRegimen) -->
+    <string name="trainingPrograms">Программы тренировок</string>
+    <string name="createTrainingProgram">Создать программу</string>
+    <string name="editTrainingProgram">Изменить программу</string>
+    <string name="programName">Название</string>
+    <string name="programDescriptionOptional">Описание (необязательно)</string>
+    <string name="cycleLengthDays">Длина цикла (дней)</string>
+    <string name="hintNoPrograms">У вас пока нет программ тренировок. Нажмите +, чтобы создать свою, или импортируйте сохранённую ранее.</string>
+    <string name="deleteProgram">Удалить программу</string>
+    <string name="deleteProgramMessage">Программа и все её задачи будут удалены. Уже записанные тренировки сохранятся.</string>
+    <string name="addTask">Добавить задачу</string>
+    <string name="editTask">Изменить задачу</string>
+    <string name="dayNumber">День %d</string>
+    <string name="dayIndex">День (1–%d)</string>
+    <string name="dayTitleOptional">Название дня (необязательно)</string>
+    <string name="workoutType">Вид тренировки</string>
+    <string name="targetSetsOptional">Целевые подходы (необязательно)</string>
+    <string name="targetRepsOptional">Целевые повторения (необязательно)</string>
+    <string name="targetDurationMinutesOptional">Целевая длительность в минутах (необязательно)</string>
+    <string name="targetDistanceKmOptional">Целевая дистанция в км (необязательно)</string>
+    <string name="taskNoteOptional">Заметка (необязательно)</string>
+    <string name="hintNoTasks">Пока нет задач. Нажмите +, чтобы добавить.</string>
+    <string name="restDay">День отдыха</string>
+    <string name="today">Сегодня</string>
+    <string name="startProgram">Начать программу</string>
+    <string name="startProgramMessage">Программа ещё не запланирована. Начните её сегодня, чтобы видеть, какая задача назначена на каждый день.</string>
+    <string name="startTask">Начать</string>
+    <string name="skipTask">Пропустить</string>
+    <string name="statusCompleted">Выполнено</string>
+    <string name="statusSkipped">Пропущено</string>
+    <string name="statusMissed">Пропущен день</string>
+    <string name="statusUpcoming">Впереди</string>
+    <string name="linkToProgram">Привязать к задаче программы</string>
+    <string name="linkToProgramDialogTitle">Какую задачу выполняет эта тренировка?</string>
+    <string name="importProgram">Импортировать программу</string>
+    <string name="exportProgram">Экспортировать программу</string>
 </resources>

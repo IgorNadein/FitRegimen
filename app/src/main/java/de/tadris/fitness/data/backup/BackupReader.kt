@@ -28,6 +28,7 @@ import com.fasterxml.jackson.module.kotlin.kotlinModule
 import de.tadris.fitness.Instance
 import de.tadris.fitness.R
 import de.tadris.fitness.data.AppDatabase
+import de.tadris.fitness.data.ProgramCompletion
 import de.tadris.fitness.data.WorkoutData
 import de.tadris.fitness.data.backup.model.DataContainer
 import java.io.IOException
@@ -126,6 +127,7 @@ class BackupReader(
 
             var workoutCount = 0
             var processedWorkouts = 0
+            var pendingProgramCompletions: List<PendingProgramCompletion> = emptyList()
 
             forEachZipEntry { entry, _ ->
                 if (isWorkoutFile(entry.name)) {
@@ -138,7 +140,7 @@ class BackupReader(
                 when {
                     entry.name == BackupWriter.FILE_DATA -> {
                         listener.onStatusChanged(20, context.getString(R.string.customWorkoutTypesTitle))
-                        restoreExtraData(stream)
+                        pendingProgramCompletions = restoreExtraData(stream)
                     }
                     isWorkoutFile(entry.name) -> {
                         val progress = 20 + (80 * processedWorkouts / workoutCount.coerceAtLeast(1))
@@ -148,6 +150,22 @@ class BackupReader(
                     }
                 }
             }
+
+            // Workout ids referenced by completions only exist once every workout_%d.json
+            // entry above has been processed, so this must run after that loop, not inside
+            // restoreExtraData() (which sees data.json before any workout file).
+            restorePendingProgramCompletions(pendingProgramCompletions)
+        }
+    }
+
+    private data class PendingProgramCompletion(val newTaskId: Long, val original: ProgramCompletion)
+
+    private fun restorePendingProgramCompletions(pending: List<PendingProgramCompletion>) {
+        for (item in pending) {
+            val workoutId = item.original.workoutId?.takeIf { database.workoutDao().findById(it) != null }
+            database.trainingProgramDao().insertCompletion(
+                item.original.copy(id = 0, programTaskId = item.newTaskId, workoutId = workoutId)
+            )
         }
     }
 
@@ -175,7 +193,7 @@ class BackupReader(
     private fun isWorkoutFile(name: String) = name.startsWith("workout_") && name.endsWith(".json")
 
     @Throws(IOException::class)
-    private fun restoreExtraData(zipStream: ZipInputStream) {
+    private fun restoreExtraData(zipStream: ZipInputStream): List<PendingProgramCompletion> {
         val dataContainer = mapper.readValue(zipStream, DataContainer::class.java)
 
         // Restore interval sets
@@ -198,6 +216,34 @@ class BackupReader(
                 database.workoutTypeDao().insert(type)
             }
         }
+
+        // Restore training programs. Ids aren't preserved (autoGenerate PKs aren't
+        // portable across devices/imports the way Workout's manually-assigned id is),
+        // so tasks/completions are re-inserted with remapped foreign keys instead.
+        val pendingCompletions = mutableListOf<PendingProgramCompletion>()
+        val programDao = database.trainingProgramDao()
+        for (programContainer in dataContainer.programs) {
+            val program = programContainer.program
+            if (!replace && programDao.getPrograms().any { it.uuid == program.uuid }) {
+                continue // already restored by a previous merge of this same backup
+            }
+            for (type in programContainer.customWorkoutTypes) {
+                if (replace || database.workoutTypeDao().findById(type.id) == null) {
+                    database.workoutTypeDao().insert(type)
+                }
+            }
+            val newProgramId = programDao.insertProgram(program.copy(id = 0))
+            val taskIdMap = mutableMapOf<Long, Long>()
+            for (task in programContainer.tasks) {
+                val newTaskId = programDao.insertTask(task.copy(id = 0, programId = newProgramId))
+                taskIdMap[task.id] = newTaskId
+            }
+            for (completion in programContainer.completions) {
+                val newTaskId = taskIdMap[completion.programTaskId] ?: continue
+                pendingCompletions.add(PendingProgramCompletion(newTaskId, completion))
+            }
+        }
+        return pendingCompletions
     }
 
     @Throws(IOException::class)

@@ -24,4 +24,6 @@ import de.tadris.fitness.data.WorkoutType
 data class DataContainer(
     val intervalSets: List<IntervalSetContainer>,
     val workoutTypes: List<WorkoutType>,
+    // Added in FitRegimen (backup format v5). Defaults to empty so older backups still deserialize.
+    val programs: List<ProgramContainer> = emptyList(),
 )

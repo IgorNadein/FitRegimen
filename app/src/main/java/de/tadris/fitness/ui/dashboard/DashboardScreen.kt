@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -69,6 +70,7 @@ fun DashboardScreen(
     onImport: () -> Unit = {},
     onSettings: () -> Unit = {},
     onStatistics: () -> Unit = {},
+    onPrograms: () -> Unit = {},
 ) {
     val workouts by workoutDao.getWorkoutsFlow().collectAsState(initial = emptyList())
     DashboardScreen(
@@ -81,6 +83,7 @@ fun DashboardScreen(
         onImport = onImport,
         onSettings = onSettings,
         onStatistics = onStatistics,
+        onPrograms = onPrograms,
     )
 }
 
@@ -96,6 +99,7 @@ fun DashboardScreen(
     onImport: () -> Unit = {},
     onSettings: () -> Unit = {},
     onStatistics: () -> Unit = {},
+    onPrograms: () -> Unit = {},
 ) {
     val context = LocalContext.current
     var fabExpanded by rememberSaveable { mutableStateOf(false) }
@@ -144,6 +148,12 @@ fun DashboardScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.workouts)) },
                 actions = {
+                    IconButton(onClick = onPrograms) {
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = stringResource(R.string.trainingPrograms),
+                        )
+                    }
                     IconButton(onClick = onStatistics) {
                         Icon(
                             painter = painterResource(R.drawable.outline_bar_chart_24),

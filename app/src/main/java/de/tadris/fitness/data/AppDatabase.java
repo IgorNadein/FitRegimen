@@ -28,7 +28,7 @@ import androidx.room.RoomDatabase;
 import androidx.room.migration.Migration;
 import androidx.sqlite.db.SupportSQLiteDatabase;
 
-@Database(version = 19, entities = {
+@Database(version = 20, entities = {
         Workout.class,
         RouteSample.class,
         WorkoutPause.class,
@@ -39,10 +39,13 @@ import androidx.sqlite.db.SupportSQLiteDatabase;
         IntervalSet.class,
         WorkoutType.class,
         ExportTargetConfiguration.class,
+        TrainingProgram.class,
+        ProgramTask.class,
+        ProgramCompletion.class,
 }, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
 
-    private static final String DATABASE_NAME = "fito-track";
+    private static final String DATABASE_NAME = "fitregimen";
 
     public abstract WorkoutDao workoutDao();
 
@@ -51,6 +54,8 @@ public abstract class AppDatabase extends RoomDatabase {
     public abstract IntervalDao intervalDao();
 
     public abstract ExportTargetDao exportTargetDao();
+
+    public abstract TrainingProgramDao trainingProgramDao();
 
     public long getLastWorkoutTimeByType(String type) {
         Workout workout = workoutDao().getLastWorkoutByType(type);
@@ -72,6 +77,9 @@ public abstract class AppDatabase extends RoomDatabase {
             db.execSQL("DELETE FROM interval");
             db.execSQL("DELETE FROM interval_set");
             db.execSQL("DELETE FROM workout_type");
+            db.execSQL("DELETE FROM program_completion");
+            db.execSQL("DELETE FROM program_task");
+            db.execSQL("DELETE FROM training_program");
             db.execSQL("DELETE FROM workout");
         });
     }
@@ -635,6 +643,52 @@ public abstract class AppDatabase extends RoomDatabase {
                             db.execSQL("INSERT INTO workout_event (id, timestamp, relativeTime, typeId, workoutId) SELECT id, timestamp, relativeTime, typeId, workoutId FROM workout_event_old");
                             db.execSQL("DROP TABLE workout_event_old");
                             db.execSQL("CREATE INDEX index_workout_event_workoutId ON workout_event (workoutId)");
+
+                            db.setTransactionSuccessful();
+                        } finally {
+                            db.endTransaction();
+                        }
+                    }
+                }, new Migration(19, 20) {
+                    @Override
+                    public void migrate(@NonNull SupportSQLiteDatabase db) {
+                        try {
+                            db.beginTransaction();
+
+                            db.execSQL("CREATE TABLE training_program (" +
+                                    "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+                                    "uuid TEXT NOT NULL," +
+                                    "name TEXT NOT NULL," +
+                                    "description TEXT," +
+                                    "cycleLengthDays INTEGER NOT NULL," +
+                                    "startDate INTEGER," +
+                                    "createdAt INTEGER NOT NULL)");
+
+                            db.execSQL("CREATE TABLE program_task (" +
+                                    "programId INTEGER NOT NULL," +
+                                    "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+                                    "dayIndex INTEGER NOT NULL," +
+                                    "dayTitle TEXT," +
+                                    "orderIndex INTEGER NOT NULL," +
+                                    "workoutTypeId TEXT NOT NULL," +
+                                    "targetSets INTEGER," +
+                                    "targetReps INTEGER," +
+                                    "targetDurationMillis INTEGER," +
+                                    "targetDistanceMeters REAL," +
+                                    "note TEXT," +
+                                    "FOREIGN KEY (programId) REFERENCES training_program(id) ON DELETE CASCADE)");
+                            db.execSQL("CREATE INDEX index_program_task_programId ON program_task (programId)");
+
+                            db.execSQL("CREATE TABLE program_completion (" +
+                                    "programTaskId INTEGER NOT NULL," +
+                                    "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+                                    "occurrenceDate INTEGER NOT NULL," +
+                                    "workoutId INTEGER," +
+                                    "status INTEGER NOT NULL," +
+                                    "FOREIGN KEY (programTaskId) REFERENCES program_task(id) ON DELETE CASCADE," +
+                                    "FOREIGN KEY (workoutId) REFERENCES workout(id) ON DELETE SET NULL)");
+                            db.execSQL("CREATE INDEX index_program_completion_programTaskId ON program_completion (programTaskId)");
+                            db.execSQL("CREATE INDEX index_program_completion_workoutId ON program_completion (workoutId)");
 
                             db.setTransactionSuccessful();
                         } finally {

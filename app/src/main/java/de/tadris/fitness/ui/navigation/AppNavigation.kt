@@ -37,7 +37,11 @@ import de.tadris.fitness.data.WorkoutType
 import de.tadris.fitness.recording.RecordingStateHolder
 import de.tadris.fitness.ui.ImportHandler
 import de.tadris.fitness.ui.ImportViewModel
+import de.tadris.fitness.data.WorkoutTypeManager
 import de.tadris.fitness.ui.dashboard.DashboardScreen
+import de.tadris.fitness.ui.programs.EditTrainingProgramScreen
+import de.tadris.fitness.ui.programs.TrainingProgramDetailScreen
+import de.tadris.fitness.ui.programs.TrainingProgramsScreen
 import de.tadris.fitness.ui.record.GpsRecordingRoute
 import de.tadris.fitness.ui.record.IndoorRecordingRoute
 import de.tadris.fitness.ui.settings.AboutScreen
@@ -127,6 +131,15 @@ sealed interface Route {
 
     @Serializable
     data class RecordIndoorWorkout(val workoutTypeId: String, val isLaunchAction: Boolean) : Route
+
+    @Serializable
+    data object TrainingPrograms : Route
+
+    @Serializable
+    data class EditTrainingProgram(val id: Long) : Route
+
+    @Serializable
+    data class TrainingProgramDetail(val id: Long) : Route
 }
 
 @Composable
@@ -168,6 +181,40 @@ fun AppNavigation(
                 },
                 onStatistics = {
                     context.startActivity(Intent(context, StatisticsActivity::class.java))
+                },
+                onPrograms = { navController.navigate(Route.TrainingPrograms) },
+            )
+        }
+        composable<Route.TrainingPrograms> {
+            TrainingProgramsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenProgram = { id -> navController.navigate(Route.TrainingProgramDetail(id)) },
+                onProgramCreated = { id -> navController.navigate(Route.EditTrainingProgram(id)) },
+            )
+        }
+        composable<Route.EditTrainingProgram> { backStackEntry ->
+            EditTrainingProgramScreen(
+                id = backStackEntry.toRoute<Route.EditTrainingProgram>().id,
+                onBack = { navController.popBackStack() },
+                onProgramDeleted = {
+                    navController.popBackStack(Route.TrainingPrograms, inclusive = false)
+                },
+            )
+        }
+        composable<Route.TrainingProgramDetail> { backStackEntry ->
+            val programId = backStackEntry.toRoute<Route.TrainingProgramDetail>().id
+            TrainingProgramDetailScreen(
+                id = programId,
+                onBack = { navController.popBackStack() },
+                onEditProgram = { navController.navigate(Route.EditTrainingProgram(programId)) },
+                onStartTask = { task ->
+                    val workoutType = WorkoutTypeManager.getInstance().getWorkoutTypeById(context, task.workoutTypeId)
+                    val route = if (RecordingType.findById(workoutType.recordingType) == RecordingType.GPS) {
+                        Route.RecordGpsWorkout(workoutType.id, false)
+                    } else {
+                        Route.RecordIndoorWorkout(workoutType.id, false)
+                    }
+                    navController.navigate(route)
                 },
             )
         }

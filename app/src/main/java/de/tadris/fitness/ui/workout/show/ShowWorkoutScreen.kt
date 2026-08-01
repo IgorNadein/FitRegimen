@@ -72,6 +72,12 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import de.tadris.fitness.Instance
 import de.tadris.fitness.R
+import de.tadris.fitness.data.PROGRAM_COMPLETION_STATUS_COMPLETED
+import de.tadris.fitness.data.ProgramCompletion
+import de.tadris.fitness.data.ProgramScheduling
+import de.tadris.fitness.data.ProgramTask
+import de.tadris.fitness.data.TrainingProgram
+import de.tadris.fitness.data.TrainingProgramDao
 import de.tadris.fitness.data.Workout
 import de.tadris.fitness.data.WorkoutTypeManager
 import de.tadris.fitness.data.preferences.UserMeasurements
@@ -88,6 +94,8 @@ import de.tadris.fitness.ui.workout.diagram.SpeedConverter
 import de.tadris.fitness.ui.workout.diagram.WorkoutDiagram
 import de.tadris.fitness.util.osm.OAuthAuthentication
 import de.tadris.fitness.util.unit.UnitUtils
+import java.time.Instant
+import java.time.ZoneId
 import java.util.Date
 import kotlin.math.roundToInt
 
@@ -182,7 +190,13 @@ private fun ShowWorkoutContent(
     var showDeleteDialog by rememberSaveable { mutableStateOf(false) }
     var showResumeDialog by rememberSaveable { mutableStateOf(false) }
     var showOsmUploadDialog by rememberSaveable { mutableStateOf(false) }
+    var showLinkDialog by rememberSaveable { mutableStateOf(false) }
     val gpxExport = rememberGpxExportState(data)
+
+    val trainingProgramDao = remember { instance.db.trainingProgramDao() }
+    var linkCandidates by remember(workout.id) {
+        mutableStateOf(findProgramLinkCandidates(trainingProgramDao, workout))
+    }
 
     val oauthLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -220,6 +234,12 @@ private fun ShowWorkoutContent(
                             text = { Text(stringResource(R.string.editWorkout)) },
                             onClick = { showMenu = false; onEditWorkout() }
                         )
+                        if (linkCandidates.isNotEmpty()) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.linkToProgram)) },
+                                onClick = { showMenu = false; showLinkDialog = true }
+                            )
+                        }
                         if (data.hasRouteData) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.exportAsGpxFile)) },
@@ -566,12 +586,94 @@ private fun ShowWorkoutContent(
         )
     }
 
+    // Link to program task dialog
+    if (showLinkDialog) {
+        AlertDialog(
+            onDismissRequest = { showLinkDialog = false },
+            title = { Text(stringResource(R.string.linkToProgramDialogTitle)) },
+            text = {
+                Column {
+                    linkCandidates.forEach { candidate ->
+                        Text(
+                            text = "${candidate.program.name} · ${
+                                candidate.task.dayTitle?.takeIf { it.isNotBlank() }
+                                    ?: stringResource(R.string.dayNumber, candidate.task.dayIndex + 1)
+                            }",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    linkWorkoutToTask(trainingProgramDao, workout, candidate)
+                                    linkCandidates = findProgramLinkCandidates(trainingProgramDao, workout)
+                                    showLinkDialog = false
+                                }
+                                .padding(vertical = 12.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showLinkDialog = false }) { Text(stringResource(R.string.cancel)) }
+            }
+        )
+    }
+
     // OSM upload dialog
     if (showOsmUploadDialog) {
         OsmUploadDialog(
             workout = workout,
             samples = data.samples,
             onDismiss = { showOsmUploadDialog = false },
+        )
+    }
+}
+
+/** A program task this workout could retroactively fulfill (FitRegimen). */
+private data class ProgramLinkCandidate(
+    val program: TrainingProgram,
+    val task: ProgramTask,
+    val occurrenceDate: Long,
+)
+
+/**
+ * Finds program tasks whose scheduled day (per [ProgramScheduling]) falls on [workout]'s
+ * own date and whose workout type matches, excluding ones already fulfilled by another
+ * workout. Anchored on the workout's date rather than "today" so linking still works for
+ * workouts recorded a few days after the fact.
+ */
+private fun findProgramLinkCandidates(
+    dao: TrainingProgramDao,
+    workout: Workout,
+): List<ProgramLinkCandidate> {
+    val zone = ZoneId.systemDefault()
+    val workoutDate = Instant.ofEpochMilli(workout.start).atZone(zone).toLocalDate()
+    val candidates = mutableListOf<ProgramLinkCandidate>()
+    for (program in dao.getPrograms()) {
+        val dayIndex = ProgramScheduling.dayIndexOf(program, workoutDate, zone) ?: continue
+        val occurrenceDate = ProgramScheduling.occurrenceMillis(workoutDate, zone)
+        val tasks = dao.getTasksOfProgram(program.id)
+            .filter { it.dayIndex == dayIndex && it.workoutTypeId == workout.workoutTypeId }
+        for (task in tasks) {
+            val existing = dao.findCompletion(task.id, occurrenceDate)
+            if (existing?.status == PROGRAM_COMPLETION_STATUS_COMPLETED) continue
+            candidates.add(ProgramLinkCandidate(program, task, occurrenceDate))
+        }
+    }
+    return candidates
+}
+
+private fun linkWorkoutToTask(dao: TrainingProgramDao, workout: Workout, candidate: ProgramLinkCandidate) {
+    val existing = dao.findCompletion(candidate.task.id, candidate.occurrenceDate)
+    if (existing != null) {
+        dao.updateCompletion(existing.copy(workoutId = workout.id, status = PROGRAM_COMPLETION_STATUS_COMPLETED))
+    } else {
+        dao.insertCompletion(
+            ProgramCompletion(
+                programTaskId = candidate.task.id,
+                occurrenceDate = candidate.occurrenceDate,
+                workoutId = workout.id,
+                status = PROGRAM_COMPLETION_STATUS_COMPLETED,
+            )
         )
     }
 }

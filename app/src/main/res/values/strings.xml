@@ -18,7 +18,7 @@
   ~     You should have received a copy of the GNU General Public License
   ~     along with this program.  If not, see <http://www.gnu.org/licenses/>.
   --><resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
-    <string name="app_name">FitoTrack</string>
+    <string name="app_name">FitRegimen</string>
     <string name="stop">Stop</string>
     <string name="delete">Delete</string>
     <string name="exporting">Exporting</string>
@@ -586,4 +586,41 @@
     <string name="recording_gps_accurate">GPS · accurate</string>
     <string name="recording_gps_weak">%d sat · weak</string>
     <string name="recording_gps_searching">%d sat · searching</string>
+
+    <!-- Training programs (FitRegimen) -->
+    <string name="trainingPrograms">Training programs</string>
+    <string name="createTrainingProgram">Create program</string>
+    <string name="editTrainingProgram">Edit program</string>
+    <string name="programName">Name</string>
+    <string name="programDescriptionOptional">Description (optional)</string>
+    <string name="cycleLengthDays">Cycle length (days)</string>
+    <string name="hintNoPrograms">You haven\'t created any training programs yet. Tap + to build one, or import one you saved earlier.</string>
+    <string name="deleteProgram">Delete program</string>
+    <string name="deleteProgramMessage">This deletes the program and all of its tasks. Workouts you already recorded are kept.</string>
+    <string name="addTask">Add task</string>
+    <string name="editTask">Edit task</string>
+    <string name="dayNumber">Day %d</string>
+    <string name="dayIndex">Day (1–%d)</string>
+    <string name="dayTitleOptional">Day title (optional)</string>
+    <string name="workoutType">Workout type</string>
+    <string name="targetSetsOptional">Target sets (optional)</string>
+    <string name="targetRepsOptional">Target reps (optional)</string>
+    <string name="targetDurationMinutesOptional">Target duration in minutes (optional)</string>
+    <string name="targetDistanceKmOptional">Target distance in km (optional)</string>
+    <string name="taskNoteOptional">Note (optional)</string>
+    <string name="hintNoTasks">No tasks yet. Tap + to add one.</string>
+    <string name="restDay">Rest day</string>
+    <string name="today">Today</string>
+    <string name="startProgram">Start program</string>
+    <string name="startProgramMessage">The program isn\'t scheduled yet. Start it today to see which task is due each day.</string>
+    <string name="startTask">Start</string>
+    <string name="skipTask">Skip</string>
+    <string name="statusCompleted">Completed</string>
+    <string name="statusSkipped">Skipped</string>
+    <string name="statusMissed">Missed</string>
+    <string name="statusUpcoming">Upcoming</string>
+    <string name="linkToProgram">Link to program task</string>
+    <string name="linkToProgramDialogTitle">Which task does this workout fulfill?</string>
+    <string name="importProgram">Import program</string>
+    <string name="exportProgram">Export program</string>
 </resources>

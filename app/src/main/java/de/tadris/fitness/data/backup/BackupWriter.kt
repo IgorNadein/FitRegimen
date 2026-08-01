@@ -27,6 +27,7 @@ import de.tadris.fitness.R
 import de.tadris.fitness.data.WorkoutData
 import de.tadris.fitness.data.backup.model.DataContainer
 import de.tadris.fitness.data.backup.model.IntervalSetContainer
+import de.tadris.fitness.data.backup.model.ProgramContainer
 import java.io.File
 import java.io.FileOutputStream
 import java.util.zip.ZipEntry
@@ -39,7 +40,7 @@ class BackupWriter(
 ) {
 
     companion object {
-        internal const val VERSION = 4
+        internal const val VERSION = 5
         internal const val FILE_VERSION = "version.txt"
         internal const val FILE_DATA = "data.json"
         internal const val FILE_WORKOUT = "workout_%d.json"
@@ -74,9 +75,22 @@ class BackupWriter(
         val intervalSets = db.intervalDao().allSets.map {
             IntervalSetContainer(it, db.intervalDao().getAllIntervalsOfSet(it.id).toList())
         }
+        val programs = db.trainingProgramDao().getPrograms().map { program ->
+            val tasks = db.trainingProgramDao().getTasksOfProgram(program.id)
+            val usedTypeIds = tasks.map { it.workoutTypeId }.toSet()
+            val customTypes = db.workoutTypeDao().findAll().filter { it.id in usedTypeIds }
+            val completions = db.trainingProgramDao().getCompletionsOfProgram(program.id)
+            ProgramContainer(
+                program = program,
+                tasks = tasks,
+                customWorkoutTypes = customTypes,
+                completions = completions,
+            )
+        }
         val container = DataContainer(
             intervalSets,
             db.workoutTypeDao().findAll().toList(),
+            programs,
         )
         zipStream.putNextEntry(ZipEntry(FILE_DATA))
         mapper.writeValue(zipStream, container)
