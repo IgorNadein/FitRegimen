@@ -34,4 +34,6 @@ data class DataContainer(
     val exerciseCatalog: List<ExerciseCatalogExport> = emptyList(),
     // Full backup only. Null means the source backup predates portable settings.
     val preferences: PortablePreferencesExport? = null,
+    // Added in backup format v9. Private profile links exist only in this full-backup block.
+    val nutritionPlans: List<NutritionPlanContainer> = emptyList(),
 )

@@ -45,7 +45,7 @@ class BackupWriter(
 ) {
 
     companion object {
-        internal const val VERSION = 8
+        internal const val VERSION = 9
         internal const val FILE_VERSION = "version.txt"
         internal const val FILE_DATA = "data.json"
         internal const val FILE_WORKOUT = "workout_%d.json"
@@ -113,6 +113,12 @@ class BackupWriter(
         val programs = programRows.map { program ->
             ProgramExporter.buildContainer(context, program, includeCompletions = true)
         }
+        val nutritionPlanRows = db.nutritionPlanDao().getPlans()
+        requireUniqueBackupUuids("nutrition plan", nutritionPlanRows.map { it.uuid })
+        val nutritionPlans = nutritionPlanRows.map { plan ->
+            NutritionPlanExporter.buildContainer(context, plan, includePrivateLinks = true)
+        }
+        validateBackupNutritionPlans(VERSION, nutritionPlans)
         val media = mutableListOf<ExerciseMediaSource>()
         val archivePathByCanonicalSource = linkedMapOf<String, String>()
         fun registerMedia(relativePath: String?, portableKey: String, ordinal: Int): String? {
@@ -203,6 +209,7 @@ class BackupWriter(
             preferences = PortablePreferencesBackup.export(
                 Instance.getInstance(context).userPreferences.preferences.all,
             ),
+            nutritionPlans = nutritionPlans,
         )
         zipStream.putNextEntry(ZipEntry(FILE_DATA))
         mapper.writeValue(zipStream, container)

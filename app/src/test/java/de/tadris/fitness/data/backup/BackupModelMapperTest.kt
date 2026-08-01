@@ -26,6 +26,7 @@ import de.tadris.fitness.data.Workout
 import de.tadris.fitness.data.WorkoutData
 import de.tadris.fitness.data.WorkoutEvent
 import de.tadris.fitness.data.WorkoutPause
+import de.tadris.fitness.data.WorkoutType
 import de.tadris.fitness.data.backup.model.CompletionExport
 import de.tadris.fitness.data.backup.model.SetLogExport
 import de.tadris.fitness.data.backup.model.TrainingSessionExport
@@ -368,5 +369,45 @@ class BackupModelMapperTest {
             "strength_imported_3",
             uniqueImportedWorkoutTypeId("strength", occupied::contains),
         )
+    }
+
+    @Test
+    fun `repeated backup restore reuses equivalent derived workout type`() {
+        val incoming = WorkoutType(
+            "strength",
+            "Strength",
+            0,
+            0xff8844,
+            "fitness_center",
+            6,
+            "INDOOR",
+        )
+        val stored = mutableMapOf(
+            "strength" to WorkoutType(
+                "strength",
+                "Unrelated local type",
+                5,
+                0,
+                "other",
+                2,
+                "OUTDOOR",
+            )
+        )
+
+        val firstTarget = resolveBackupWorkoutTypeId(
+            incoming = incoming,
+            reservedIds = BUILT_IN_WORKOUT_TYPE_IDS,
+            findById = stored::get,
+        )
+        stored[firstTarget] = copyWorkoutTypeWithId(incoming, firstTarget)
+        val repeatedTarget = resolveBackupWorkoutTypeId(
+            incoming = incoming,
+            reservedIds = BUILT_IN_WORKOUT_TYPE_IDS,
+            findById = stored::get,
+        )
+
+        assertEquals("strength_imported", firstTarget)
+        assertEquals(firstTarget, repeatedTarget)
+        assertEquals(2, stored.size)
     }
 }

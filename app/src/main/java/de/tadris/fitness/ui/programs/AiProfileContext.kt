@@ -37,11 +37,11 @@ internal fun FitnessProfile.toAiProfileContext(
     val identityTokens = buildList {
         val normalizedName = name.trim()
         normalizedName
-            .takeIf { it.length >= 4 && it.lowercase() !in GENERIC_PROFILE_NAMES }
+            .takeIf { it.length >= 2 && it.lowercase() !in GENERIC_PROFILE_NAMES }
             ?.let(::add)
         normalizedName
             .split(Regex("[^\\p{L}\\p{N}]+"))
-            .filter { it.length >= 3 && it.lowercase() !in GENERIC_PROFILE_NAMES }
+            .filter { it.length >= 2 && it.lowercase() !in GENERIC_PROFILE_NAMES }
             .forEach(::add)
         uuid.trim().takeIf { it.isNotEmpty() }?.let(::add)
         birthDate()?.let { date ->
@@ -50,7 +50,7 @@ internal fun FitnessProfile.toAiProfileContext(
             add(date.format(DateTimeFormatter.ofPattern("dd/MM/uuuu")))
             add(date.format(DateTimeFormatter.ofPattern("MM/dd/uuuu")))
         }
-    }
+    }.distinct()
     return AiProfileContext(
         ageYears = ageOn(today),
         heightCm = heightCm,
@@ -118,7 +118,7 @@ private fun String?.toReadableProfileParameters(identityTokens: List<String>): S
             .filter { (key, _) ->
                 val normalizedKey = key.lowercase().replace(Regex("[^a-zа-я0-9]+"), "_").trim('_')
                 normalizedKey !in PRIVATE_PROFILE_ATTRIBUTE_KEYS &&
-                    identityTokens.none { token -> key.contains(token, ignoreCase = true) }
+                    !key.containsProfileIdentity(identityTokens)
             }
             .mapNotNull { (key, value) ->
                 val primitive = value as? JsonPrimitive ?: return@mapNotNull null
@@ -137,7 +137,7 @@ private fun String?.toReadableProfileParameters(identityTokens: List<String>): S
 private fun String?.redactProfileIdentity(identityTokens: List<String>): String? {
     var value = this?.cleanPromptValue() ?: return null
     identityTokens.sortedByDescending(String::length).forEach { token ->
-        value = value.replace(token, PROFILE_REDACTION, ignoreCase = true)
+        value = value.replace(identityTokenPattern(token), PROFILE_REDACTION)
     }
     value = value
         .replace(EMAIL_PATTERN, PROFILE_REDACTION)
@@ -147,6 +147,14 @@ private fun String?.redactProfileIdentity(identityTokens: List<String>): String?
         .replace(Regex("(?:${Regex.escape(PROFILE_REDACTION)}[ ,;:]*){2,}"), "$PROFILE_REDACTION ")
     return value.cleanPromptValue()
 }
+
+private fun String.containsProfileIdentity(identityTokens: List<String>): Boolean =
+    identityTokens.any { identityTokenPattern(it).containsMatchIn(this) }
+
+/** Exact Unicode word/phrase matching avoids replacing a short name inside unrelated words. */
+private fun identityTokenPattern(token: String): Regex = Regex(
+    pattern = "(?iu)(?<![\\p{L}\\p{N}])${Regex.escape(token)}(?![\\p{L}\\p{N}])",
+)
 
 private const val MAX_PROMPT_PROFILE_TEXT_LENGTH = 1_500
 private const val MAX_CUSTOM_PROFILE_ATTRIBUTES = 24

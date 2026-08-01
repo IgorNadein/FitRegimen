@@ -11,16 +11,21 @@ import de.tadris.fitness.data.CompletionRule
 import de.tadris.fitness.data.Exercise
 import de.tadris.fitness.data.MeasurementSource
 import de.tadris.fitness.data.MetricKind
+import de.tadris.fitness.data.WorkoutType
 import de.tadris.fitness.data.backup.model.DataContainer
 import de.tadris.fitness.data.backup.model.CompletionExport
 import de.tadris.fitness.data.backup.model.DayExport
 import de.tadris.fitness.data.backup.model.ExerciseEntryExport
 import de.tadris.fitness.data.backup.model.ExerciseExport
+import de.tadris.fitness.data.backup.model.LegacyProgramTaskExport
+import de.tadris.fitness.data.backup.model.PROGRAM_CONTAINER_FORMAT_VERSION
 import de.tadris.fitness.data.backup.model.ProgramContainer
 import de.tadris.fitness.data.backup.model.ProgramExport
+import de.tadris.fitness.data.backup.model.SetExport
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -236,6 +241,290 @@ class ProgramFormatCompatibilityTest {
     }
 
     @Test
+    fun `full program definition detects metadata day entry set and exercise changes`() {
+        val existing = backupMergeProgram()
+        val baseDay = existing.days.single()
+        val baseEntry = baseDay.exercises.single()
+        val variants = listOf(
+            existing.copy(
+                program = existing.program.copy(description = "Changed metadata", icon = "run"),
+            ),
+            existing.copy(
+                days = listOf(baseDay.copy(name = "Changed day", isRest = true)),
+            ),
+            existing.copy(
+                days = listOf(
+                    baseDay.copy(
+                        exercises = listOf(
+                            baseEntry.copy(
+                                note = "Changed entry",
+                                completionRule = "METRIC_TARGET_REACHED",
+                            )
+                        ),
+                    )
+                ),
+            ),
+            existing.copy(
+                days = listOf(
+                    baseDay.copy(
+                        exercises = listOf(
+                            baseEntry.copy(
+                                sets = listOf(baseEntry.sets.single().copy(reps = 12)),
+                            )
+                        ),
+                    )
+                ),
+            ),
+            existing.copy(
+                exercises = listOf(
+                    existing.exercises.single().copy(
+                        description = "Changed exercise definition",
+                        met = 8.0,
+                    )
+                ),
+            ),
+        )
+
+        variants.forEach { incoming ->
+            assertFalse(trainingProgramDefinitionsEquivalent(existing, incoming))
+            val decision = resolveProgramBackupMerge(
+                sourceUuid = "program-source",
+                sourceDefinitionIdentity = trainingProgramDefinitionFingerprint(incoming),
+                replace = false,
+                candidateState = { uuid ->
+                    when {
+                        uuid != "program-source" -> ProgramBackupCandidateState.MISSING
+                        trainingProgramDefinitionsEquivalent(existing, incoming) ->
+                            ProgramBackupCandidateState.EQUIVALENT
+                        else -> ProgramBackupCandidateState.DIVERGENT
+                    }
+                },
+            )
+            assertTrue(decision is ProgramBackupMergeDecision.Import)
+            assertFalse(decision.targetUuid == "program-source")
+        }
+    }
+
+    @Test
+    fun `repeated divergent program merge reuses deterministic content UUID`() {
+        val local = backupMergeProgram()
+        val incoming = local.copy(
+            program = local.program.copy(description = "Incoming version"),
+        )
+        val sourceIdentity = trainingProgramDefinitionFingerprint(incoming)
+        val programs = mutableMapOf("program-source" to local)
+        val candidateState: (String) -> ProgramBackupCandidateState = { uuid ->
+            val candidate = programs[uuid]
+            when {
+                candidate == null -> ProgramBackupCandidateState.MISSING
+                trainingProgramDefinitionsEquivalent(candidate, incoming) ->
+                    ProgramBackupCandidateState.EQUIVALENT
+                else -> ProgramBackupCandidateState.DIVERGENT
+            }
+        }
+
+        val first = resolveProgramBackupMerge(
+            sourceUuid = "program-source",
+            sourceDefinitionIdentity = sourceIdentity,
+            replace = false,
+            candidateState = candidateState,
+        ) as ProgramBackupMergeDecision.Import
+        assertFalse(first.targetUuid == "program-source")
+        programs[first.targetUuid] = incoming.copy(
+            program = incoming.program.copy(uuid = first.targetUuid),
+        )
+
+        val repeated = resolveProgramBackupMerge(
+            sourceUuid = "program-source",
+            sourceDefinitionIdentity = sourceIdentity,
+            replace = false,
+            candidateState = candidateState,
+        ) as ProgramBackupMergeDecision.Reuse
+
+        assertEquals(first.targetUuid, repeated.targetUuid)
+    }
+
+    @Test
+    fun `program definition ignores runtime start and completion history`() {
+        val definition = backupMergeProgram()
+        val runtimeChanged = definition.copy(
+            program = definition.program.copy(startDate = 1_800_000_000_000),
+            completions = listOf(
+                CompletionExport(
+                    dayIndex = 0,
+                    exerciseIndex = 0,
+                    occurrenceDate = 1_800_000_000_000,
+                    status = 1,
+                )
+            ),
+        )
+
+        assertTrue(trainingProgramDefinitionsEquivalent(definition, runtimeChanged))
+    }
+
+    @Test
+    fun `program definition is stable across equivalent custom type id remap`() {
+        val sourceType = WorkoutType(
+            "custom-source",
+            "Indoor circuit",
+            0,
+            0xff8844.toInt(),
+            "fitness_center",
+            6,
+            "INDOOR",
+        )
+        val source = backupMergeProgram().copy(
+            exercises = listOf(
+                backupMergeProgram().exercises.single().copy(
+                    workoutTypeId = sourceType.id,
+                )
+            ),
+            customWorkoutTypes = listOf(sourceType),
+        )
+        val remappedType = copyWorkoutTypeWithId(sourceType, "custom-source_imported")
+        val remapped = source.copy(
+            exercises = listOf(
+                source.exercises.single().copy(workoutTypeId = remappedType.id),
+            ),
+            customWorkoutTypes = listOf(remappedType),
+        )
+
+        assertTrue(trainingProgramDefinitionsEquivalent(source, remapped))
+    }
+
+    @Test
+    fun `divergent local exercise gets stable portable identity and program copy`() {
+        val source = backupMergeProgram()
+        val sourceExercise = source.exercises.single()
+        val localExercise = sourceExercise.copy(
+            description = "Local description",
+            met = 3.0,
+        )
+        assertFalse(
+            trainingExerciseDefinitionFingerprint(sourceExercise) ==
+                trainingExerciseDefinitionFingerprint(localExercise)
+        )
+        val sourceExerciseIdentity = trainingExerciseDefinitionFingerprint(sourceExercise)
+        val derivedExerciseUuid = deterministicTrainingExerciseBackupCopyUuid(
+            sourceUuid = sourceExercise.uuid.orEmpty(),
+            sourceDefinitionIdentity = sourceExerciseIdentity,
+            attempt = 0,
+        )
+        assertEquals(
+            derivedExerciseUuid,
+            deterministicTrainingExerciseBackupCopyUuid(
+                sourceUuid = sourceExercise.uuid.orEmpty(),
+                sourceDefinitionIdentity = sourceExerciseIdentity,
+                attempt = 0,
+            )
+        )
+        val resolved = source.copy(
+            exercises = listOf(sourceExercise.copy(uuid = derivedExerciseUuid)),
+            days = listOf(
+                source.days.single().copy(
+                    exercises = listOf(
+                        source.days.single().exercises.single().copy(
+                            exerciseUuid = derivedExerciseUuid,
+                        )
+                    ),
+                )
+            ),
+        )
+        val localProgram = source.copy(exercises = listOf(localExercise))
+        val programs = mutableMapOf("program-source" to localProgram)
+        val expectedIdentity = trainingProgramDefinitionFingerprint(resolved)
+        val candidateState: (String) -> ProgramBackupCandidateState = { uuid ->
+            val candidate = programs[uuid]
+            when {
+                candidate == null -> ProgramBackupCandidateState.MISSING
+                trainingProgramDefinitionFingerprint(candidate) == expectedIdentity ->
+                    ProgramBackupCandidateState.EQUIVALENT
+                else -> ProgramBackupCandidateState.DIVERGENT
+            }
+        }
+        val sourceIdentity = trainingProgramDefinitionFingerprint(source)
+        val first = resolveProgramBackupMerge(
+            sourceUuid = "program-source",
+            sourceDefinitionIdentity = sourceIdentity,
+            replace = false,
+            candidateState = candidateState,
+        ) as ProgramBackupMergeDecision.Import
+        programs[first.targetUuid] = resolved.copy(
+            program = resolved.program.copy(uuid = first.targetUuid),
+        )
+
+        val repeated = resolveProgramBackupMerge(
+            sourceUuid = "program-source",
+            sourceDefinitionIdentity = sourceIdentity,
+            replace = false,
+            candidateState = candidateState,
+        ) as ProgramBackupMergeDecision.Reuse
+
+        assertEquals(first.targetUuid, repeated.targetUuid)
+        assertEquals("Base exercise", resolved.exercises.single().description)
+        assertEquals(6.0, resolved.exercises.single().met!!, 0.0)
+    }
+
+    @Test
+    fun `legacy v1 and v2 policies canonicalize to restored v3 definition`() {
+        val v1 = ProgramContainer(
+            formatVersion = 1,
+            program = ProgramExport(uuid = "legacy-v1", name = "Legacy v1"),
+            tasks = listOf(
+                LegacyProgramTaskExport(
+                    id = 1,
+                    workoutTypeId = "push_ups",
+                    targetReps = 10,
+                )
+            ),
+        )
+        val v2 = ProgramContainer(
+            formatVersion = 2,
+            program = ProgramExport(uuid = "legacy-v2", name = "Legacy v2"),
+            exercises = listOf(
+                ExerciseExport(uuid = "plank", name = "Plank", metricKind = "DURATION")
+            ),
+            days = listOf(
+                DayExport(
+                    exercises = listOf(
+                        ExerciseEntryExport(
+                            exerciseUuid = "plank",
+                            sets = listOf(SetExport(durationMillis = 30_000)),
+                        )
+                    )
+                )
+            ),
+        )
+
+        listOf(v1, v2).forEach { legacy ->
+            val normalized = ProgramImporter.normalizeForImport(legacy)
+            val exercisesByUuid = normalized.exercises.associateBy { it.uuid.orEmpty() }
+            val materialized = normalized.copy(
+                formatVersion = PROGRAM_CONTAINER_FORMAT_VERSION,
+                days = normalized.days.map { day ->
+                    day.copy(
+                        exercises = day.exercises.map { entry ->
+                            val exercise = exercisesByUuid.getValue(entry.exerciseUuid)
+                            val policy = ProgramImporter.executionPolicyFor(
+                                entry = entry,
+                                metricKind = MetricKind.findByName(exercise.metricKind),
+                                workoutTypeId = exercise.workoutTypeId,
+                            )
+                            entry.copy(
+                                measurementSource = policy.measurementSource.name,
+                                completionRule = policy.completionRule.name,
+                                prepareSeconds = entry.prepareSeconds ?: 0,
+                            )
+                        },
+                    )
+                },
+            )
+
+            assertTrue(trainingProgramDefinitionsEquivalent(legacy, materialized))
+        }
+    }
+
+    @Test
     fun `backup v5 data without sessions deserializes as empty guided history`() {
         val mapper = jsonMapper { addModule(kotlinModule()) }
         val restored = mapper.readValue(
@@ -282,4 +571,43 @@ class ProgramFormatCompatibilityTest {
         assertNull(completion.profileUuidSnapshot)
         assertNull(completion.userWeightKgSnapshot)
     }
+
+    private fun backupMergeProgram() = ProgramContainer(
+        program = ProgramExport(
+            uuid = "program-source",
+            name = "Strength plan",
+            description = "Base metadata",
+            icon = "fitness_center",
+            startDate = 1_700_000_000_000,
+            createdAt = 1_600_000_000_000,
+        ),
+        exercises = listOf(
+            ExerciseExport(
+                uuid = "squat",
+                name = "Squat",
+                metricKind = "WEIGHT_REPS",
+                description = "Base exercise",
+                tips = "Keep balance",
+                met = 6.0,
+                secondsPerRep = 3.0,
+            )
+        ),
+        days = listOf(
+            DayExport(
+                name = "Lower body",
+                exercises = listOf(
+                    ExerciseEntryExport(
+                        exerciseUuid = "squat",
+                        note = "Base entry",
+                        restSeconds = 60,
+                        measurementSource = "USER_INPUT",
+                        completionRule = "USER_CONFIRM",
+                        prepareSeconds = 5,
+                        transitionSeconds = 30,
+                        sets = listOf(SetExport(reps = 10, weightKg = 40.0)),
+                    )
+                ),
+            )
+        ),
+    )
 }

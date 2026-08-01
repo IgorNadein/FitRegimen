@@ -38,10 +38,10 @@ class BackupValidationTest {
     fun `modern manifest requires one version and one data entry`() {
         val valid = validateModernBackupManifest(
             entryNames = listOf("version.txt", "data.json", "workout_0.json"),
-            versionText = "8\n",
+            versionText = "9\n",
         )
 
-        assertEquals(8, valid.version)
+        assertEquals(9, valid.version)
         expectThrows<IOException> {
             validateModernBackupManifest(listOf("version.txt"), "7")
         }
@@ -59,7 +59,7 @@ class BackupValidationTest {
             validateModernBackupManifest(listOf("version.txt", "data.json"), "3")
         }
         expectThrows<BackupReader.UnsupportedVersionException> {
-            validateModernBackupManifest(listOf("version.txt", "data.json"), "9")
+            validateModernBackupManifest(listOf("version.txt", "data.json"), "10")
         }
     }
 

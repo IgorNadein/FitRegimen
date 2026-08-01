@@ -16,12 +16,13 @@
  *     You should have received a copy of the GNU General Public License
  *     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * Modified in FitRegimen (fork of FitoTrack): training-programs routes and the
- * four-destination Material 3 bottom navigation.
+ * Modified in FitRegimen (fork of FitoTrack): training and nutrition routes with
+ * the five-destination Material 3 bottom navigation.
  */
 
 package de.tadris.fitness.ui.navigation
 
+import androidx.annotation.StringRes
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
@@ -49,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -72,6 +74,11 @@ import de.tadris.fitness.recording.RecordingStateHolder
 import de.tadris.fitness.ui.ImportHandler
 import de.tadris.fitness.ui.ImportViewModel
 import de.tadris.fitness.ui.dashboard.DashboardScreen
+import de.tadris.fitness.ui.nutrition.EditNutritionPlanScreen
+import de.tadris.fitness.ui.nutrition.NutritionAiPromptScreen
+import de.tadris.fitness.ui.nutrition.NutritionDayEditorScreen
+import de.tadris.fitness.ui.nutrition.NutritionPlanDetailScreen
+import de.tadris.fitness.ui.nutrition.NutritionPlansScreen
 import de.tadris.fitness.ui.programs.AiPromptScreen
 import de.tadris.fitness.ui.programs.DayEditorScreen
 import de.tadris.fitness.ui.programs.EditTrainingProgramScreen
@@ -212,6 +219,21 @@ sealed interface Route {
     data object TrainingPrograms : Route
 
     @Serializable
+    data object NutritionPlans : Route
+
+    @Serializable
+    data class NutritionPlanDetail(val id: Long) : Route
+
+    @Serializable
+    data class EditNutritionPlan(val id: Long) : Route
+
+    @Serializable
+    data class NutritionDayEditor(val dayId: Long) : Route
+
+    @Serializable
+    data object NutritionAiPrompt : Route
+
+    @Serializable
     data class EditTrainingProgram(val id: Long) : Route
 
     @Serializable
@@ -232,6 +254,16 @@ sealed interface Route {
 
     @Serializable
     data object AiPrompt : Route
+}
+
+@Composable
+private fun BottomNavigationLabel(@StringRes textRes: Int) {
+    Text(
+        text = stringResource(textRes),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        style = MaterialTheme.typography.labelSmall,
+    )
 }
 
 @Composable
@@ -259,9 +291,11 @@ fun AppNavigation(
     val currentDestination = backStackEntry?.destination
     val onDashboardTab = currentDestination?.hasRoute(Route.Dashboard::class) == true
     val onProgramsTab = currentDestination?.hasRoute(Route.TrainingPrograms::class) == true
+    val onNutritionTab = currentDestination?.hasRoute(Route.NutritionPlans::class) == true
     val onStatisticsTab = currentDestination?.hasRoute(Route.Statistics::class) == true
     val onSettingsTab = currentDestination?.hasRoute(Route.Settings::class) == true
-    val showBottomBar = onDashboardTab || onProgramsTab || onStatisticsTab || onSettingsTab
+    val showBottomBar = onDashboardTab || onProgramsTab || onNutritionTab ||
+        onStatisticsTab || onSettingsTab
     var actionMenuExpanded by rememberSaveable { mutableStateOf(false) }
 
     fun navigateToTopLevel(route: Route) {
@@ -407,7 +441,7 @@ fun AppNavigation(
                                     contentDescription = null,
                                 )
                             },
-                            label = { Text(stringResource(R.string.workouts)) },
+                            label = { BottomNavigationLabel(R.string.workouts) },
                         )
                         NavigationBarItem(
                             selected = onProgramsTab,
@@ -417,7 +451,22 @@ fun AppNavigation(
                                 }
                             },
                             icon = { Icon(Icons.Default.DateRange, contentDescription = null) },
-                            label = { Text(stringResource(R.string.programs)) },
+                            label = { BottomNavigationLabel(R.string.programs) },
+                        )
+                        NavigationBarItem(
+                            selected = onNutritionTab,
+                            onClick = {
+                                if (!onNutritionTab) {
+                                    navigateToTopLevel(Route.NutritionPlans)
+                                }
+                            },
+                            icon = {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_nutrition_24),
+                                    contentDescription = null,
+                                )
+                            },
+                            label = { BottomNavigationLabel(R.string.nutritionTab) },
                         )
                         NavigationBarItem(
                             selected = onStatisticsTab,
@@ -432,7 +481,7 @@ fun AppNavigation(
                                     contentDescription = null,
                                 )
                             },
-                            label = { Text(stringResource(R.string.statistics)) },
+                            label = { BottomNavigationLabel(R.string.statistics) },
                         )
                         NavigationBarItem(
                             selected = onSettingsTab,
@@ -442,7 +491,7 @@ fun AppNavigation(
                                 }
                             },
                             icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                            label = { Text(stringResource(R.string.settings)) },
+                            label = { BottomNavigationLabel(R.string.settings) },
                         )
                     }
                     if (actionMenuExpanded) {
@@ -500,6 +549,15 @@ fun AppNavigation(
                     onOpenProgram = { id -> navController.navigate(Route.TrainingProgramDetail(id)) },
                     onProgramCreated = { id -> navController.navigate(Route.EditTrainingProgram(id)) },
                     onAiPrompt = { navController.navigate(Route.AiPrompt) },
+                )
+            }
+            composable<Route.NutritionPlans> {
+                NutritionPlansScreen(
+                    fabExpanded = actionMenuExpanded,
+                    onFabExpandedChange = { actionMenuExpanded = it },
+                    onOpenPlan = { id -> navController.navigate(Route.NutritionPlanDetail(id)) },
+                    onPlanCreated = { id -> navController.navigate(Route.EditNutritionPlan(id)) },
+                    onAiPrompt = { navController.navigate(Route.NutritionAiPrompt) },
                 )
             }
             composable<Route.Statistics> {
@@ -567,6 +625,43 @@ fun AppNavigation(
                 AiPromptScreen(
                     onBack = { navController.popBackStack() },
                     onManageProfiles = { navController.navigate(Route.FitnessProfiles) },
+                )
+            }
+            composable<Route.NutritionPlanDetail> { entry ->
+                val planId = entry.toRoute<Route.NutritionPlanDetail>().id
+                NutritionPlanDetailScreen(
+                    id = planId,
+                    onBack = { navController.popBackStack() },
+                    onEditPlan = { navController.navigate(Route.EditNutritionPlan(planId)) },
+                )
+            }
+            composable<Route.EditNutritionPlan> { entry ->
+                EditNutritionPlanScreen(
+                    id = entry.toRoute<Route.EditNutritionPlan>().id,
+                    onBack = { navController.popBackStack() },
+                    onPlanDeleted = {
+                        navController.popBackStack(Route.NutritionPlans, inclusive = false)
+                    },
+                    onOpenDay = { dayId ->
+                        navController.navigate(Route.NutritionDayEditor(dayId))
+                    },
+                )
+            }
+            composable<Route.NutritionDayEditor> { entry ->
+                NutritionDayEditorScreen(
+                    dayId = entry.toRoute<Route.NutritionDayEditor>().dayId,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable<Route.NutritionAiPrompt> {
+                NutritionAiPromptScreen(
+                    onBack = { navController.popBackStack() },
+                    onManageProfiles = { navController.navigate(Route.FitnessProfiles) },
+                    onPlanImported = { planId ->
+                        navController.navigate(Route.NutritionPlanDetail(planId)) {
+                            popUpTo(Route.NutritionPlans)
+                        }
+                    },
                 )
             }
             composable<Route.ShowWorkoutFullscreenMap> { backStack ->

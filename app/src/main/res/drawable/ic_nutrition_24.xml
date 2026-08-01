@@ -1,0 +1,17 @@
+<!--
+  ~ Copyright (c) 2026 Jannis Scheibe <jannis@tadris.de>
+  ~
+  ~ This file is part of FitRegimen, a fork of FitoTrack, and is licensed
+  ~ under the GNU General Public License version 3 or later.
+  -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M11,9L9,9L9,2L7,2L7,9L5,9L5,2L3,2L3,9C3,11.21 4.79,13 7,13L7,22L9,22L9,13C11.21,13 13,11.21 13,9L13,2L11,2L11,9ZM16,6L16,14L18,14L18,22L20,22L20,2C17.79,2 16,3.79 16,6Z" />
+
+</vector>

@@ -29,7 +29,7 @@ import androidx.room.TypeConverters;
 import androidx.room.migration.Migration;
 import androidx.sqlite.db.SupportSQLiteDatabase;
 
-@Database(version = 28, entities = {
+@Database(version = 29, entities = {
         Workout.class,
         RouteSample.class,
         WorkoutPause.class,
@@ -52,6 +52,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase;
         SessionExercise.class,
         SessionSet.class,
         FitnessProfile.class,
+        NutritionPlan.class,
+        NutritionDay.class,
+        NutritionMeal.class,
+        NutritionItem.class,
+        NutritionPlanProfile.class,
 }, exportSchema = false)
 @TypeConverters({
         MetricKindConverter.class,
@@ -83,6 +88,8 @@ public abstract class AppDatabase extends RoomDatabase {
 
     public abstract FitnessProfileDao fitnessProfileDao();
 
+    public abstract NutritionPlanDao nutritionPlanDao();
+
     public long getLastWorkoutTimeByType(String type) {
         Workout workout = workoutDao().getLastWorkoutByType(type);
         if (workout != null) {
@@ -103,6 +110,11 @@ public abstract class AppDatabase extends RoomDatabase {
             db.execSQL("DELETE FROM interval");
             db.execSQL("DELETE FROM interval_set");
             db.execSQL("DELETE FROM workout_type");
+            db.execSQL("DELETE FROM nutrition_item");
+            db.execSQL("DELETE FROM nutrition_meal");
+            db.execSQL("DELETE FROM nutrition_day");
+            db.execSQL("DELETE FROM nutrition_plan_profile");
+            db.execSQL("DELETE FROM nutrition_plan");
             db.execSQL("DELETE FROM session_set");
             db.execSQL("DELETE FROM session_exercise");
             db.execSQL("DELETE FROM training_session");
@@ -1084,6 +1096,85 @@ public abstract class AppDatabase extends RoomDatabase {
                         db.execSQL("ALTER TABLE workout ADD COLUMN userWeightKgSnapshot REAL");
                         db.execSQL("ALTER TABLE workout ADD COLUMN stepLengthMetersSnapshot REAL");
                         db.execSQL("CREATE INDEX index_workout_profileUuid ON workout (profileUuid)");
+                    }
+                }, new Migration(28, 29) {
+                    @Override
+                    public void migrate(@NonNull SupportSQLiteDatabase db) {
+                        db.execSQL("CREATE TABLE nutrition_plan (" +
+                                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+                                "uuid TEXT NOT NULL," +
+                                "name TEXT NOT NULL," +
+                                "description TEXT," +
+                                "objective TEXT," +
+                                "preferences TEXT," +
+                                "restrictions TEXT," +
+                                "linkedTrainingProgramUuid TEXT," +
+                                "startDateEpochDay INTEGER," +
+                                "createdAt INTEGER NOT NULL," +
+                                "updatedAt INTEGER NOT NULL)");
+                        db.execSQL("CREATE UNIQUE INDEX index_nutrition_plan_uuid " +
+                                "ON nutrition_plan (uuid)");
+
+                        db.execSQL("CREATE TABLE nutrition_day (" +
+                                "planId INTEGER NOT NULL," +
+                                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+                                "orderIndex INTEGER NOT NULL," +
+                                "name TEXT," +
+                                "notes TEXT," +
+                                "energyKcal REAL," +
+                                "proteinGrams REAL," +
+                                "fatGrams REAL," +
+                                "carbsGrams REAL," +
+                                "fiberGrams REAL," +
+                                "waterMl REAL," +
+                                "FOREIGN KEY (planId) REFERENCES nutrition_plan(id) ON DELETE CASCADE)");
+                        db.execSQL("CREATE INDEX index_nutrition_day_planId " +
+                                "ON nutrition_day (planId)");
+                        db.execSQL("CREATE UNIQUE INDEX index_nutrition_day_planId_orderIndex " +
+                                "ON nutrition_day (planId, orderIndex)");
+
+                        db.execSQL("CREATE TABLE nutrition_meal (" +
+                                "dayId INTEGER NOT NULL," +
+                                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+                                "orderIndex INTEGER NOT NULL," +
+                                "name TEXT NOT NULL," +
+                                "plannedTimeMinutes INTEGER," +
+                                "notes TEXT," +
+                                "FOREIGN KEY (dayId) REFERENCES nutrition_day(id) ON DELETE CASCADE)");
+                        db.execSQL("CREATE INDEX index_nutrition_meal_dayId " +
+                                "ON nutrition_meal (dayId)");
+                        db.execSQL("CREATE UNIQUE INDEX index_nutrition_meal_dayId_orderIndex " +
+                                "ON nutrition_meal (dayId, orderIndex)");
+
+                        db.execSQL("CREATE TABLE nutrition_item (" +
+                                "mealId INTEGER NOT NULL," +
+                                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+                                "orderIndex INTEGER NOT NULL," +
+                                "name TEXT NOT NULL," +
+                                "quantity REAL," +
+                                "unit TEXT," +
+                                "weightGrams REAL," +
+                                "energyKcal REAL," +
+                                "proteinGrams REAL," +
+                                "fatGrams REAL," +
+                                "carbsGrams REAL," +
+                                "fiberGrams REAL," +
+                                "notes TEXT," +
+                                "FOREIGN KEY (mealId) REFERENCES nutrition_meal(id) ON DELETE CASCADE)");
+                        db.execSQL("CREATE INDEX index_nutrition_item_mealId " +
+                                "ON nutrition_item (mealId)");
+                        db.execSQL("CREATE UNIQUE INDEX index_nutrition_item_mealId_orderIndex " +
+                                "ON nutrition_item (mealId, orderIndex)");
+
+                        // Profile UUID intentionally has no FK. Nutrition plans from a full
+                        // backup remain usable even when a selected profile is unavailable.
+                        db.execSQL("CREATE TABLE nutrition_plan_profile (" +
+                                "planId INTEGER NOT NULL," +
+                                "profileUuid TEXT NOT NULL," +
+                                "PRIMARY KEY (planId, profileUuid)," +
+                                "FOREIGN KEY (planId) REFERENCES nutrition_plan(id) ON DELETE CASCADE)");
+                        db.execSQL("CREATE INDEX index_nutrition_plan_profile_profileUuid " +
+                                "ON nutrition_plan_profile (profileUuid)");
                     }
                 })
                 .allowMainThreadQueries()

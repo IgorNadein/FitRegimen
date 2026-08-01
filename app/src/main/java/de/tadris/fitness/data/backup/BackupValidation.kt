@@ -24,6 +24,7 @@ import de.tadris.fitness.data.backup.model.FitnessProfileExport
 import de.tadris.fitness.data.backup.model.IntervalSetContainer
 import de.tadris.fitness.data.backup.model.TrainingSessionExport
 import de.tadris.fitness.data.backup.model.ProgramContainer
+import de.tadris.fitness.data.backup.model.NutritionPlanContainer
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
@@ -279,6 +280,32 @@ internal fun validateBackupPrograms(version: Int, exports: List<ProgramContainer
                 ).forEach { requireFiniteOrNull(it, "completion set measurement") }
             }
         }
+    }
+}
+
+/** Strict v9 validation for private nutrition-plan trees in a full backup. */
+@Throws(IOException::class)
+internal fun validateBackupNutritionPlans(
+    version: Int,
+    exports: List<NutritionPlanContainer>,
+) {
+    if (version < 9) {
+        if (exports.isNotEmpty()) {
+            throw IOException("Nutrition plans require backup format version 9")
+        }
+        return
+    }
+    val uuids = exports.map { it.plan.uuid?.trim().orEmpty() }
+    if (uuids.any(String::isEmpty) || uuids.distinct().size != uuids.size) {
+        throw IOException("Backup contains missing or duplicate nutrition-plan UUIDs")
+    }
+    exports.forEach { container ->
+        validateNutritionPlanContainer(
+            container = container,
+            allowPrivateFields = true,
+            requireUuid = true,
+            requirePrivateTimestamps = true,
+        )
     }
 }
 

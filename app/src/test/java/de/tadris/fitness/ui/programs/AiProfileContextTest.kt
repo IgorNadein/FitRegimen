@@ -91,4 +91,21 @@ class AiProfileContextTest {
         assertFalse(combined.contains("nested:"))
         assertTrue(combined.contains("[private]"))
     }
+
+    @Test
+    fun `short profile name is redacted as a whole word without damaging other words`() {
+        val profile = FitnessProfile(
+            uuid = "profile-short-name",
+            name = "Ли",
+            notes = "Ли предпочитает брокколи, но лилия — просто цветок",
+            createdAt = 1,
+            updatedAt = 1,
+        )
+
+        val notes = profile.toAiProfileContext(LocalDate.of(2026, 8, 2)).notes.orEmpty()
+
+        assertFalse(notes.contains("Ли предпочитает", ignoreCase = true))
+        assertTrue(notes.contains("[private]"))
+        assertTrue(notes.contains("лилия", ignoreCase = true))
+    }
 }

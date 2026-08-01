@@ -16,11 +16,13 @@ import com.fasterxml.jackson.module.kotlin.kotlinModule
 import de.tadris.fitness.Instance
 import de.tadris.fitness.R
 import de.tadris.fitness.data.AppDatabase
+import de.tadris.fitness.data.Exercise
 import de.tadris.fitness.data.FitnessProfile
 import de.tadris.fitness.data.FitnessProfileDraft
 import de.tadris.fitness.data.FitnessProfileSnapshot
 import de.tadris.fitness.data.Interval
 import de.tadris.fitness.data.IntervalSet
+import de.tadris.fitness.data.MetricKind
 import de.tadris.fitness.data.ProgramCompletion
 import de.tadris.fitness.data.ProgramOccurrenceHistoryRepository
 import de.tadris.fitness.data.PROGRAM_OCCURRENCE_WORKOUT_UUID_PREFIX
@@ -31,10 +33,13 @@ import de.tadris.fitness.data.TrainingSessionStatus
 import de.tadris.fitness.data.WorkoutData
 import de.tadris.fitness.data.WorkoutType
 import de.tadris.fitness.data.WorkoutTypeManager
+import de.tadris.fitness.data.isSupportedExerciseVideoUrl
 import de.tadris.fitness.data.backup.model.CompletionExport
 import de.tadris.fitness.data.backup.model.DataContainer
 import de.tadris.fitness.data.backup.model.ExerciseCatalogExport
+import de.tadris.fitness.data.backup.model.ExerciseExport
 import de.tadris.fitness.data.backup.model.FitnessProfileExport
+import de.tadris.fitness.data.backup.model.ProgramContainer
 import de.tadris.fitness.data.backup.model.TrainingSessionExport
 import de.tadris.fitness.data.backup.model.toEntity
 import java.io.File
@@ -58,6 +63,7 @@ class BackupReader(
     private val importedIntervalSetIdMap = mutableMapOf<Long, Long>()
     private val importedWorkoutTypeIdMap = mutableMapOf<String, String>()
     private val importedProgramUuidMap = mutableMapOf<String, String>()
+    private val importedProgramContentIdentityMap = mutableMapOf<String, String>()
     private val mapper = jsonMapper {
         addModule(kotlinModule())
         configure(StreamReadFeature.IGNORE_UNDEFINED, true)
@@ -84,6 +90,7 @@ class BackupReader(
                 importedIntervalSetIdMap.clear()
                 importedWorkoutTypeIdMap.clear()
                 importedProgramUuidMap.clear()
+                importedProgramContentIdentityMap.clear()
                 restoreDatabase(preflight, restoredMedia.pathByArchiveEntry)
                 databaseCommitted = true
 
@@ -224,6 +231,7 @@ class BackupReader(
             val validatedProfiles = validateBackupProfiles(manifest.version, parsedData.profiles)
             validateExerciseCatalog(parsedData.exerciseCatalog, manifest.entryNames)
             validateBackupPrograms(manifest.version, parsedData.programs)
+            validateBackupNutritionPlans(manifest.version, parsedData.nutritionPlans)
             parsedData.preferences?.let(PortablePreferencesBackup::decode)
             validateBackupTrainingSessions(
                 version = manifest.version,
@@ -544,31 +552,58 @@ class BackupReader(
         val backedUpActiveProfile = validatedProfiles.firstOrNull { (export, _) -> export.isActive }
         val programDao = database.trainingProgramDao()
         for (rawProgramContainer in dataContainer.programs) {
-            val programContainer = remapProgramWorkoutTypes(
-                ProgramImporter.normalizeForImport(rawProgramContainer)
+            val sourceProgramContainer = ProgramImporter.normalizeForImport(rawProgramContainer)
+            val programContainer = resolveProgramExerciseDefinitions(
+                source = sourceProgramContainer,
+                remapped = remapProgramWorkoutTypes(sourceProgramContainer),
             )
             val importedProgramUuid = programContainer.program.uuid?.trim()?.takeIf(String::isNotEmpty)
-            val existingProgram = importedProgramUuid?.let { uuid ->
-                programDao.getPrograms().firstOrNull { it.uuid == uuid }
+            val sourceDefinitionIdentity = trainingProgramDefinitionFingerprint(sourceProgramContainer)
+            val expectedDefinitionIdentity = trainingProgramDefinitionFingerprint(programContainer)
+            val mergeDecision = importedProgramUuid?.let { sourceUuid ->
+                resolveProgramBackupMerge(
+                    sourceUuid = sourceUuid,
+                    sourceDefinitionIdentity = sourceDefinitionIdentity,
+                    replace = replace,
+                    candidateState = { candidateUuid ->
+                        val candidate = programDao.getPrograms()
+                            .firstOrNull { it.uuid == candidateUuid }
+                        if (candidate == null) {
+                            ProgramBackupCandidateState.MISSING
+                        } else {
+                            val candidateIdentity = trainingProgramDefinitionFingerprint(
+                                ProgramExporter.buildContainer(
+                                    context = context,
+                                    program = candidate,
+                                    includeCompletions = true,
+                                )
+                            )
+                            if (candidateIdentity == expectedDefinitionIdentity) {
+                                ProgramBackupCandidateState.EQUIVALENT
+                            } else {
+                                ProgramBackupCandidateState.DIVERGENT
+                            }
+                        }
+                    },
+                )
             }
-            val canMergeIntoExisting = !replace && existingProgram != null &&
-                existingProgramTreeMatches(existingProgram.id, programContainer)
             val targetProgramId: Long
             val targetProgramUuid: String
-            if (canMergeIntoExisting) {
+            if (mergeDecision is ProgramBackupMergeDecision.Reuse) {
+                val existingProgram = programDao.getPrograms()
+                    .firstOrNull { it.uuid == mergeDecision.targetUuid }
+                    ?: throw IOException("Resolved training program cannot be found")
                 targetProgramId = existingProgram.id
                 targetProgramUuid = existingProgram.uuid
             } else {
-                // Do not swallow malformed or divergent data. A UUID collision with
-                // a different local tree becomes a second, fully preserved program.
+                // A divergent source UUID is preserved under a deterministic UUID
+                // derived from the complete source definition.
                 targetProgramId = ProgramImporter.import(context, programContainer)
                 val restored = programDao.findProgramById(targetProgramId)
                     ?: throw IOException("Restored program cannot be found")
-                targetProgramUuid = if (existingProgram == null) {
-                    importedProgramUuid ?: restored.uuid
-                } else {
-                    UUID.randomUUID().toString()
-                }
+                targetProgramUuid = (mergeDecision as? ProgramBackupMergeDecision.Import)
+                    ?.targetUuid
+                    ?: restored.uuid
                 programDao.updateProgram(
                     restored.copy(
                         uuid = targetProgramUuid,
@@ -579,7 +614,10 @@ class BackupReader(
                     ),
                 )
             }
-            importedProgramUuid?.let { importedProgramUuidMap[it] = targetProgramUuid }
+            importedProgramUuid?.let {
+                importedProgramUuidMap[it] = targetProgramUuid
+                importedProgramContentIdentityMap[it] = sourceDefinitionIdentity
+            }
             val days = programDao.getDaysOfProgram(targetProgramId)
             for (completionExport in programContainer.completions) {
                 val day = days.getOrNull(completionExport.dayIndex)
@@ -598,6 +636,31 @@ class BackupReader(
                 )
             }
         }
+        // Nutrition plan trees are restored only after profiles and training programs.
+        // Profiles retain their portable UUID during restore; training programs may be
+        // assigned a new UUID on a divergent merge and therefore use the explicit map.
+        dataContainer.nutritionPlans.forEach { container ->
+            val remapped = container.remapLinkedTrainingProgramUuid(importedProgramUuidMap)
+            val decision = resolveNutritionBackupMerge(
+                source = container,
+                incoming = remapped,
+                linkedProgramContentIdentity = container.plan.linkedTrainingProgramUuid
+                    ?.let(importedProgramContentIdentityMap::get),
+                replace = replace,
+                findByUuid = { uuid ->
+                    database.nutritionPlanDao().findPlanByUuid(uuid)?.let { existing ->
+                        NutritionPlanExporter.buildContainer(
+                            context = context,
+                            plan = existing,
+                            includePrivateLinks = true,
+                        )
+                    }
+                },
+            )
+            if (decision is NutritionBackupMergeDecision.Import) {
+                NutritionPlanImporter.importFromBackup(context, decision.container)
+            }
+        }
         return PendingExtraData(
             completions = pendingCompletions,
             sessions = dataContainer.sessions,
@@ -605,36 +668,109 @@ class BackupReader(
         )
     }
 
-    private fun existingProgramTreeMatches(
-        programId: Long,
-        incoming: de.tadris.fitness.data.backup.model.ProgramContainer,
-    ): Boolean {
-        val programDao = database.trainingProgramDao()
+    /**
+     * ProgramImporter normally enriches a catalog collision and keeps local non-blank
+     * metadata. A full backup instead needs a portable copy of a divergent definition;
+     * otherwise the restored program can never match its own source fingerprint.
+     */
+    private fun resolveProgramExerciseDefinitions(
+        source: ProgramContainer,
+        remapped: ProgramContainer,
+    ): ProgramContainer {
         val exerciseDao = database.exerciseDao()
-        val days = programDao.getDaysOfProgram(programId)
-        if (days.size != incoming.days.size) return false
-        return days.indices.all { dayIndex ->
-            val entries = programDao.getExercisesOfDay(days[dayIndex].id)
-            val incomingEntries = incoming.days[dayIndex].exercises
-            entries.size == incomingEntries.size && entries.indices.all { exerciseIndex ->
-                val entry = entries[exerciseIndex]
-                val incomingEntry = incomingEntries[exerciseIndex]
-                val exerciseUuid = exerciseDao.findById(entry.exerciseId)?.uuid
-                val sets = programDao.getSetsOfProgramExercise(entry.id)
-                exerciseUuid == incomingEntry.exerciseUuid &&
-                    sets.size == incomingEntry.sets.size &&
-                    sets.indices.all { setIndex ->
-                        val set = sets[setIndex]
-                        val importedSet = incomingEntry.sets[setIndex]
-                        set.type.name == importedSet.type.trim().uppercase() &&
-                            set.reps == importedSet.reps && set.repsMax == importedSet.repsMax &&
-                            set.weightKg == importedSet.weightKg &&
-                            set.durationMillis == importedSet.durationMillis &&
-                            set.distanceMeters == importedSet.distanceMeters
+        val sourceByUuid = source.exercises.associateBy { it.uuid.orEmpty() }
+        val targetUuidBySourceUuid = linkedMapOf<String, String>()
+        val resolvedExercises = remapped.exercises.map { incoming ->
+            val sourceUuid = incoming.uuid.orEmpty()
+            val sourceExercise = sourceByUuid[sourceUuid] ?: incoming
+            val sourceIdentity = trainingExerciseDefinitionFingerprint(
+                exercise = sourceExercise,
+                customWorkoutTypes = source.customWorkoutTypes,
+            )
+            val expectedIdentity = trainingExerciseDefinitionFingerprint(
+                exercise = incoming,
+                customWorkoutTypes = remapped.customWorkoutTypes,
+            )
+            fun existingIdentity(existing: Exercise): String =
+                trainingExerciseDefinitionFingerprint(
+                    exercise = existing.toProgramExerciseExport(),
+                    customWorkoutTypes = existing.workoutTypeId
+                        ?.let(database.workoutTypeDao()::findById)
+                        ?.let { listOf(it) }
+                        .orEmpty(),
+                )
+
+            val kind = MetricKind.findByName(incoming.metricKind.trim().uppercase())
+            val collision = exerciseDao.findByUuid(sourceUuid)
+                ?: exerciseDao.findByNameAndKind(incoming.name.trim(), kind.name)
+            val targetUuid = when {
+                collision == null -> sourceUuid
+                existingIdentity(collision) == expectedIdentity -> collision.uuid
+                else -> {
+                    var resolvedUuid: String? = null
+                    for (attempt in 0 until MAX_BACKUP_EXERCISE_UUID_ATTEMPTS) {
+                        val candidateUuid = deterministicTrainingExerciseBackupCopyUuid(
+                            sourceUuid = sourceUuid,
+                            sourceDefinitionIdentity = sourceIdentity,
+                            attempt = attempt,
+                        )
+                        val candidate = exerciseDao.findByUuid(candidateUuid)
+                        when {
+                            candidate == null -> {
+                                exerciseDao.insert(incoming.toBackupExercise(candidateUuid))
+                                resolvedUuid = candidateUuid
+                            }
+                            existingIdentity(candidate) == expectedIdentity -> {
+                                resolvedUuid = candidateUuid
+                            }
+                        }
+                        if (resolvedUuid != null) break
                     }
+                    resolvedUuid
+                        ?: throw IOException("Unable to allocate a backup exercise UUID")
+                }
             }
+            targetUuidBySourceUuid[sourceUuid] = targetUuid
+            incoming.copy(uuid = targetUuid)
         }
+        return remapped.copy(
+            exercises = resolvedExercises,
+            days = remapped.days.map { day ->
+                day.copy(
+                    exercises = day.exercises.map { entry ->
+                        entry.copy(
+                            exerciseUuid = targetUuidBySourceUuid[entry.exerciseUuid]
+                                ?: entry.exerciseUuid,
+                        )
+                    },
+                )
+            },
+        )
     }
+
+    private fun Exercise.toProgramExerciseExport(): ExerciseExport = ExerciseExport(
+        uuid = uuid,
+        name = name,
+        metricKind = metricKind.name,
+        workoutTypeId = workoutTypeId,
+        description = description,
+        tips = tips,
+        videoUrl = videoUrl,
+        met = met,
+        secondsPerRep = secondsPerRep,
+    )
+
+    private fun ExerciseExport.toBackupExercise(uuid: String): Exercise = Exercise(
+        uuid = uuid,
+        name = name.trim(),
+        metricKind = MetricKind.findByName(metricKind.trim().uppercase()),
+        workoutTypeId = workoutTypeId?.takeIf(String::isNotBlank),
+        description = description?.trim()?.takeIf(String::isNotEmpty),
+        tips = tips?.trim()?.takeIf(String::isNotEmpty),
+        videoUrl = videoUrl?.trim()?.takeIf(::isSupportedExerciseVideoUrl),
+        met = met?.takeIf { it.isFinite() && it in 0.5..25.0 },
+        secondsPerRep = secondsPerRep?.takeIf { it.isFinite() && it in 0.1..60.0 },
+    )
 
     /**
      * Interval ids predate portable UUIDs. On merge, remap collisions as a whole
@@ -715,15 +851,11 @@ class BackupReader(
         types.forEach { incoming ->
             val importedId = incoming.id.trim()
             if (importedId.isEmpty()) throw IOException("A custom workout type has no id")
-            val existing = dao.findById(importedId)
-            val targetId = when {
-                importedId !in BUILT_IN_WORKOUT_TYPE_IDS && existing == null -> importedId
-                importedId !in BUILT_IN_WORKOUT_TYPE_IDS &&
-                    workoutTypesEquivalent(existing, incoming) -> importedId
-                else -> uniqueImportedWorkoutTypeId(importedId) { candidate ->
-                    candidate in BUILT_IN_WORKOUT_TYPE_IDS || dao.findById(candidate) != null
-                }
-            }
+            val targetId = resolveBackupWorkoutTypeId(
+                incoming = incoming,
+                reservedIds = BUILT_IN_WORKOUT_TYPE_IDS,
+                findById = dao::findById,
+            )
             if (dao.findById(targetId) == null) {
                 dao.insert(copyWorkoutTypeWithId(incoming, targetId))
             }
@@ -908,6 +1040,7 @@ class BackupReader(
     private companion object {
         const val MAX_VERSION_BYTES = 64L
         const val MAX_MEDIA_ENTRY_BYTES = 100L * 1024L * 1024L
+        const val MAX_BACKUP_EXERCISE_UUID_ATTEMPTS = 1_024
     }
 }
 
@@ -951,6 +1084,36 @@ internal fun uniqueImportedWorkoutTypeId(
         val suffix = if (ordinal == 1) "_imported" else "_imported_$ordinal"
         val candidate = base + suffix
         if (!isOccupied(candidate)) return candidate
+        check(ordinal < Int.MAX_VALUE) { "No workout type id is available" }
+        ordinal++
+    }
+}
+
+/**
+ * Reuses the first equivalent derived row before allocating another suffix.
+ * This keeps repeated merge restores idempotent and their portable id remap stable.
+ */
+internal fun resolveBackupWorkoutTypeId(
+    incoming: WorkoutType,
+    reservedIds: Set<String>,
+    findById: (String) -> WorkoutType?,
+): String {
+    val importedId = incoming.id.trim()
+    require(importedId.isNotEmpty()) { "A custom workout type must have an id" }
+
+    fun canUse(candidate: String): Boolean {
+        if (candidate in reservedIds) return false
+        val existing = findById(candidate)
+        return existing == null || workoutTypesEquivalent(existing, incoming)
+    }
+
+    if (canUse(importedId)) return importedId
+    val base = importedId.take(80).ifBlank { "custom" }
+    var ordinal = 1
+    while (true) {
+        val suffix = if (ordinal == 1) "_imported" else "_imported_$ordinal"
+        val candidate = base + suffix
+        if (canUse(candidate)) return candidate
         check(ordinal < Int.MAX_VALUE) { "No workout type id is available" }
         ordinal++
     }
