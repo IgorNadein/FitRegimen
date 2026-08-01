@@ -422,9 +422,6 @@ fun SetEditorSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        // Set rows are the sole vertical scroll owner. If the sheet also consumes
-        // their boundary fling, both animations can keep handing velocity back.
-        sheetGesturesEnabled = false,
     ) {
         Column(
             modifier = Modifier

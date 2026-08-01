@@ -1222,9 +1222,6 @@ private fun LogExerciseSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        // The log form already scrolls. Keeping the sheet out of that nested-scroll
-        // chain avoids settling the sheet again after a fast boundary fling.
-        sheetGesturesEnabled = false,
     ) {
         Column(
             modifier = Modifier

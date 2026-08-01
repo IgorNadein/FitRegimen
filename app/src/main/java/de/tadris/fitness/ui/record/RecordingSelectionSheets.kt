@@ -173,8 +173,6 @@ internal fun BluetoothDevicePickerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        // Device results own the vertical scroll and the header has an explicit close.
-        sheetGesturesEnabled = false,
     ) {
         SheetHeader(
             title = stringResource(R.string.selectBluetoothDevice),
@@ -322,8 +320,6 @@ internal fun RecordingInformationPickerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        // Metric results own the vertical scroll and the header has an explicit close.
-        sheetGesturesEnabled = false,
     ) {
         SheetHeader(
             title = stringResource(R.string.recording_picker_metric_title),

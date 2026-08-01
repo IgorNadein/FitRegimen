@@ -1413,9 +1413,6 @@ private fun ExerciseDetailsSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        // Long instructions scroll inside the sheet; do not pass their boundary
-        // fling into the sheet's draggable state.
-        sheetGesturesEnabled = false,
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxWidth(),

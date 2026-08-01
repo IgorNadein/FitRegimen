@@ -32,7 +32,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
@@ -502,15 +501,10 @@ fun ExerciseEditorSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        // The form owns vertical scrolling. Letting the sheet participate in the same
-        // nested-scroll chain can make a fast fling at either edge repeatedly settle
-        // the sheet while the form is still decelerating (visible as endless jumping).
-        sheetGesturesEnabled = false,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.94f)
                 .imePadding(),
         ) {
             Row(

@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
@@ -483,16 +482,11 @@ private fun FitnessProfileEditorSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        // This full-height editor has its own scrolling region and close action.
-        // Keeping it out of the sheet's draggable nested-scroll chain prevents a
-        // boundary fling from making the form and the sheet oscillate vertically.
-        sheetGesturesEnabled = false,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = 720.dp)
-                .fillMaxHeight()
                 .navigationBarsPadding()
                 .imePadding(),
         ) {
