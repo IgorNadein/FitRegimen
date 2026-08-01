@@ -35,7 +35,7 @@ allprojects {
 android {
     namespace 'de.tadris.fitness'
     defaultConfig {
-        applicationId "de.tadris.fitness"
+        applicationId "com.fitregimen.app"
         minSdkVersion 26
         compileSdk 37
         targetSdkVersion 37

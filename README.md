@@ -1,23 +1,15 @@
-# FitoTrack
+# FitRegimen
 
-FitoTrack is a mobile app for logging and viewing your workouts. Whether you're running, cycling or hiking, FitoTrack will show you the most important information, with detailed charts and statistics. It is open-source and completely ad-free.
+FitRegimen is a hard fork of [FitoTrack](https://codeberg.org/jannis/FitoTrack) by
+Jannis Scheibe. All workout-tracking functionality (GPS/indoor recording, statistics,
+GPX/backup import-export, etc.) comes from upstream FitoTrack — this fork adds a fully
+offline, user-authored **training programs** layer on top: plan a multi-day cycle of
+tasks yourself (or import one someone shared with you), then link the workouts you
+record back to the plan to track adherence. There are no built-in preset programs —
+you build or import your own, the same way FitoTrack already lets you import/export
+individual workouts.
 
-<p>
-
-  <a href="https://codeberg.org/teaserbot-labs/delightful-humane-design">
-    <img src="https://codeberg.org/teaserbot-labs/delightful-humane-design/raw/branch/main/humane-tech-badge.svg" alt="Delightful Humane Tech" />
-  </a>
-
-  <a href="https://hosted.weblate.org/engage/fitotrack/">
-    <img src="https://hosted.weblate.org/widgets/fitotrack/-/android/svg-badge.svg" alt="Translation status" />
-  </a>
-
-</p>
-
-<p align="center">
-  <a href="https://play.google.com/store/apps/details?id=de.tadris.fitness"><img alt="Get it on Google Play" src="https://codeberg.org/jannis/FitoTrack/media/branch/master/doc/badge-google-play.png" height="75"/></a>
-  <a href="https://f-droid.org/packages/de.tadris.fitness"><img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" alt="Get it on F-Droid" height="75"></a>
-</p>
+It is open-source (GPLv3), completely ad-free, and works fully offline.
 
 ## Screenshots
 
@@ -40,31 +32,25 @@ Please see the [user guide](https://codeberg.org/jannis/FitoTrack/wiki/How-to-us
 
 ## Contributing
 
-Do you find the app useful and want to contribute to make it even better? Here are some ways you can help:
+Issues and PRs against the training-programs feature belong in this repo. For anything
+about the underlying tracking functionality itself (recording, statistics, GPX/backup
+format), consider contributing upstream instead:
 
-* **Report issues.** A very simple way of contributing to the project is to report crashes and bugs, as well as suggest possible new features. You can join the [Telegram Group](https://t.me/fitotrack)/[Matrix Room](https://matrix.to/#/#fitotrack:matrix.org?via=matrix.org) and share your ideas regarding the app.
-* **Share the app.** Tell your friends, family, and colleagues about the app, in real life and online. You could, for example, write a post about FitoTrack on your favorite social media networks.
-* **Translate.** You can [translate](https://codeberg.org/jannis/FitoTrack/wiki/Translation) FitoTrack on [Weblate](https://hosted.weblate.org/engage/fitotrack/) without writing a single line of code.
-* **Write code.** If you're able to write code for Android or just want to help with translations, please refer to the [Contribution](https://codeberg.org/jannis/FitoTrack/wiki/Contributing) site in the project wiki.
+* **Translate.** The base app's strings are [translated](https://codeberg.org/jannis/FitoTrack/wiki/Translation) upstream on [Weblate](https://hosted.weblate.org/engage/fitotrack/); this fork's own new strings are not yet on Weblate.
+* **Upstream community.** Upstream FitoTrack has a [Telegram Group](https://t.me/fitotrack)/[Matrix Room](https://matrix.to/#/#fitotrack:matrix.org?via=matrix.org) for general app discussion.
 
-### Donate
+### Support upstream
 
-When I started programming this app I decided that it should be completely free and open-source. This also means that there will be no income for me from ads or paid features. So if you enjoy the app and want to support my work you can do so:
-
-<a href="https://liberapay.com/jannis/donate">
-    <img alt="Donate using Liberapay" src="https://liberapay.com/assets/widgets/donate.svg">
-  </a>
-
-* [Liberapay](https://liberapay.com/jannis/donate) (via PayPal)
-* [Paypal](https://www.paypal.com/donate/?hosted_button_id=TACE5TRSC29WE)
-* BTC: 3BSbGRbJaiSxVg3D6nVRK5C1SZEezhjtK5
-* Monero: 8BZg7sSRBQEFo5pPKRMAzChShivWy5JvXApXLpBinkBsWbYFqHVNEXeUGWqFTcGiiN7B6TW8qwssgATePGiCrJhTQg5hEw8
-
-You can also [email](mailto:jannis@tadris.de) me or join the [Telegram Group](https://t.me/fitotrack)/[Matrix Room](https://matrix.to/#/#fitotrack:matrix.org?via=matrix.org) to get in touch with me.
+FitRegimen wouldn't exist without Jannis Scheibe's work on FitoTrack. If you find the
+app useful, consider [supporting the original project](https://liberapay.com/jannis/donate).
 
 ## License
 
-Copyright (C) 2026 Jannis Scheibe <jannis@tadris.de>
+FitRegimen is a fork of FitoTrack and remains licensed under the GNU General Public
+License v3 (or later), same as upstream. Files changed in this fork are marked as
+such in their headers; unmodified files retain their original FitoTrack copyright.
+
+Copyright (C) 2026 Jannis Scheibe <jannis@tadris.de> (original FitoTrack)
 
 	FitoTrack is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
