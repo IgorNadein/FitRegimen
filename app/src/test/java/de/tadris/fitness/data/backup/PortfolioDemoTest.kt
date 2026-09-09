@@ -4,6 +4,8 @@ package de.tadris.fitness.data.backup
 import de.tadris.fitness.data.CompletionRule
 import de.tadris.fitness.data.MeasurementSource
 import de.tadris.fitness.data.MetricKind
+import de.tadris.fitness.data.backup.model.DataContainer
+import java.util.zip.ZipInputStream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -46,4 +48,26 @@ class PortfolioDemoTest {
         assertTrue(plan.profileUuids.isEmpty())
         assertEquals(null, plan.startDateEpochDay)
     }
+
+    @Test
+    fun `bundled backup contains restorable plans and completed session`() {
+        val entries = mutableMapOf<String, ByteArray>()
+        ZipInputStream(javaClass.getResourceAsStream("/portfolio-backup.ftb")!!).use { zip ->
+            var entry = zip.nextEntry
+            while (entry != null) {
+                entries[entry.name] = zip.readBytes()
+                zip.closeEntry()
+                entry = zip.nextEntry
+            }
+        }
+        val version = entries.getValue("version.txt").toString(Charsets.UTF_8).toInt()
+        val data = backupJsonMapper().readValue(entries.getValue("data.json"), DataContainer::class.java)
+        assertEquals(1, validateBackupProfiles(version, data.profiles).size)
+        validateBackupNutritionPlans(version, data.nutritionPlans)
+        assertEquals("Portfolio demo", data.programs.single().program.name)
+        assertTrue(data.programs.single().days.last().isRest)
+        assertEquals("Portfolio menu", data.nutritionPlans.single().plan.name)
+        assertEquals("COMPLETED", data.sessions.single().status)
+    }
+
 }
