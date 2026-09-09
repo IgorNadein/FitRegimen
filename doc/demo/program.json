@@ -1,0 +1,62 @@
+{
+  "type": "fitregimen-program",
+  "formatVersion": 3,
+  "program": {
+    "name": "Portfolio demo",
+    "description": "A short interface walkthrough: two manual sets and a 20-second timer. Demo data, not a training prescription.",
+    "icon": "fitness_center"
+  },
+  "exercises": [
+    {
+      "uuid": "portfolio-demo-squat",
+      "name": "Bodyweight squat",
+      "metricKind": "REPS",
+      "description": "Demo: confirm the repetition counter to advance.",
+      "secondsPerRep": 3
+    },
+    {
+      "uuid": "portfolio-demo-timer",
+      "name": "Standing recovery",
+      "metricKind": "DURATION",
+      "description": "A short timer to demonstrate automatic completion."
+    }
+  ],
+  "days": [
+    {
+      "name": "Quick walkthrough",
+      "exercises": [
+        {
+          "exerciseUuid": "portfolio-demo-squat",
+          "measurementSource": "USER_INPUT",
+          "completionRule": "USER_CONFIRM",
+          "prepareSeconds": 3,
+          "restSeconds": 5,
+          "transitionSeconds": 5,
+          "sets": [
+            {
+              "reps": 5
+            },
+            {
+              "reps": 5
+            }
+          ]
+        },
+        {
+          "exerciseUuid": "portfolio-demo-timer",
+          "measurementSource": "CLOCK",
+          "completionRule": "DURATION_REACHED",
+          "prepareSeconds": 3,
+          "sets": [
+            {
+              "durationMillis": 20000
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Rest day",
+      "isRest": true
+    }
+  ]
+}

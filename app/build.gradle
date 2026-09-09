@@ -39,8 +39,8 @@ android {
         minSdkVersion 26
         compileSdk 37
         targetSdkVersion 37
-        versionCode 1620
-        versionName "16.2"
+        versionCode 1621
+        versionName "0.1.0"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
@@ -52,6 +52,9 @@ android {
         debug {
             applicationIdSuffix = ".debug"
         }
+    }
+    sourceSets {
+        test.resources.srcDir "$rootDir/doc/demo"
     }
     buildFeatures {
         compose true

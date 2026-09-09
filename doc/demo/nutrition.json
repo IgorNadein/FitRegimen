@@ -1,0 +1,68 @@
+{
+  "type": "fitregimen-nutrition-plan",
+  "formatVersion": 1,
+  "plan": {
+    "name": "Portfolio menu",
+    "description": "Fictional demo data for the nutrition editor; illustrative quantities and estimates.",
+    "objective": "Explore meals, foods and daily totals"
+  },
+  "days": [
+    {
+      "name": "Demo day",
+      "waterMl": 2000,
+      "meals": [
+        {
+          "name": "Breakfast",
+          "plannedTimeMinutes": 480,
+          "items": [
+            {
+              "name": "Oatmeal with berries",
+              "quantity": 1,
+              "unit": "bowl",
+              "weightGrams": 250,
+              "energyKcal": 320,
+              "proteinGrams": 12,
+              "fatGrams": 8,
+              "carbsGrams": 50,
+              "fiberGrams": 7
+            }
+          ]
+        },
+        {
+          "name": "Lunch",
+          "plannedTimeMinutes": 780,
+          "items": [
+            {
+              "name": "Rice, vegetables and tofu",
+              "quantity": 1,
+              "unit": "plate",
+              "weightGrams": 400,
+              "energyKcal": 540,
+              "proteinGrams": 26,
+              "fatGrams": 16,
+              "carbsGrams": 73,
+              "fiberGrams": 9
+            }
+          ]
+        },
+        {
+          "name": "Dinner",
+          "plannedTimeMinutes": 1140,
+          "items": [
+            {
+              "name": "Lentil soup and toast",
+              "quantity": 1,
+              "unit": "serving",
+              "weightGrams": 350,
+              "energyKcal": 430,
+              "proteinGrams": 22,
+              "fatGrams": 10,
+              "carbsGrams": 63,
+              "fiberGrams": 11
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
