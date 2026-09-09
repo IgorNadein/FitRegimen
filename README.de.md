@@ -31,12 +31,14 @@ Aufnahmen der Android-App mit den [mitgelieferten Beispieldateien](doc/demo). Di
 
 ## Ausprobieren
 
-1. Die signierte **FitRegimen-0.1.0.apk** aus den [Releases](https://github.com/IgorNadein/FitRegimen/releases/latest) auf Android **8.0 oder neuer** installieren.
+1. Die signierte **FitRegimen-0.2.0.apk** aus den [Releases](https://github.com/IgorNadein/FitRegimen/releases/latest) auf Android **8.0 oder neuer** installieren.
 2. [program.json](https://raw.githubusercontent.com/IgorNadein/FitRegimen/master/doc/demo/program.json) herunterladen und unter **Programme → + → Programm importieren** auswählen.
 3. **Quick walkthrough** öffnen, zwei Sätze bestätigen, den 20-Sekunden-Timer abschließen und das Ergebnis ansehen.
 4. Eine Sicherung exportieren und wiederherstellen. Die [Demo-Anleitung](doc/demo/README.md) enthält genaue Schritte und erwartete Ergebnisse, auch für Ernährung und KI-Import.
 
 Für die Demo werden weder Konto noch GPS-Aufzeichnung oder externer KI-Dienst benötigt. Die fiktiven Beispieldaten dienen der Bedienungsdemonstration und sind keine persönlichen Trainings- oder Ernährungsempfehlungen.
+
+Ab Version 0.2.0 kannst du unter **Einstellungen → Updates** GitHub Releases prüfen, eine verifizierte APK herunterladen und das Android-Installationsprogramm öffnen. Version 0.1.0 muss einmal manuell aktualisiert werden. [Technische Details](doc/updates.md).
 
 ## Was „KI“ hier bedeutet
 

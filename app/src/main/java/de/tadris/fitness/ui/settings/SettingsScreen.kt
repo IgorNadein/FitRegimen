@@ -45,6 +45,7 @@ fun SettingsScreen(
     onNavigateToExercises: () -> Unit = {},
     onNavigateToDebugSettings: () -> Unit = {},
     onNavigateToAbout: () -> Unit = {},
+    onNavigateToUpdates: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -64,6 +65,13 @@ fun SettingsScreen(
         },
     ) { padding ->
         LazyColumn(contentPadding = padding) {
+            item {
+                ClickableSettingsItem(
+                    title = stringResource(R.string.updatesTitle),
+                    supporting = stringResource(R.string.updatesSummary),
+                    onClick = onNavigateToUpdates,
+                )
+            }
             item {
                 ClickableSettingsItem(
                     title = stringResource(R.string.fitness_profiles_title),

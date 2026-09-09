@@ -1,44 +1,41 @@
-# Privacy Policy
+# FitRegimen privacy information
 
-## Introduction
+FitRegimen is designed primarily as a local, offline app and does not require a FitRegimen account. Optional network features are described below.
 
-This policy explains what data the Android app "FitoTrack" stores and how it is used.
+## Data stored by the app
 
-## Collected information
+Profiles, body measurements, workout plans, workout history, recorded routes, heart-rate and activity data, backups, and exercise media are stored on your device or in a location you choose. The FitRegimen developer does not operate an app backend that automatically receives this data. If Android system backup is enabled, the operating system may also include app data in a device or account backup controlled by the OS provider, not the FitRegimen developer.
 
-As the creator/maintainer of FitoTrack I, Jannis Scheibe, DO NOT COLLECT ANY PERSONAL DATA.
+## Developer data collection
 
-FitoTrack saves all settings and workout related data on the device. This includes:
+FitRegimen contains no advertising or analytics SDK. The app does not automatically send personal, fitness, or location data to the FitRegimen developer.
 
-- settings
-- GPS samples recorded during the workout
-- aggregated workout data
-- interval sets
+## Permissions
 
-## How the data is used
+Location, physical activity, Bluetooth, notifications, foreground service, wake lock, vibration, network, and legacy storage access support features such as workout recording, sensors, maps, media playback, exports, and background operation. Android controls the runtime permissions you grant, and you can revoke them in system settings.
 
-The data is used to record your workouts and display statistics after your workouts.
+## Network and external services
 
-Please also view the [Permissions-Statement](https://codeberg.org/jannis/FitoTrack/wiki/Permissions) that explains why FitoTrack needs the permissions it requests.
+Optional features may contact third parties: online map-tile servers, exercise-video hosts, OpenStreetMap authentication and upload, links and email apps, and HTTP export destinations you configure. These services receive the data needed for the request and apply their own policies. A configured automatic export can send workout or backup files after recording. If you choose an http:// destination, that transfer may be unencrypted.
 
-## What data is shared
+## App updates
 
-Private information is NEVER shared without your explicit consent.
+Opening Updates contacts GitHub to check the latest release. Downloading an update contacts GitHub and its asset servers. They receive ordinary request information, including your IP address; no profile, nutrition, workout or backup data is sent. APK files remain in the app cache and are shared with the Android installer only when you request installation. Android controls permission to install from FitRegimen.
 
-If you choose to upload your workouts as GPS-traces to [OpenStreetMap](https://www.openstreetmap.org/) in order to improve the map quality the workout route will be transferred to the OpenStreetMap Foundation so please refer to their [Privacy Policy](https://wiki.osmfoundation.org/wiki/Privacy_Policy) to learn more about how the data is used.
-FitoTrack gives the option to protect your routes so they are publicly not linked to your account by choosing the visibility option "private".
-Further FitoTrack is able to cut the start and finish of your uploaded route to hide the location where you started (e.g. your home location).
+[Update mechanism](updates.md).
 
-## Data retention and deletion
+## Sharing, files, and backups
 
-FitoTrack does not transmit or store any user data on external servers. All data (settings, GPS samples, workout statistics) is stored exclusively on your device and remains there until you uninstall the app or delete it manually within the app.
+Sharing or export happens when you choose it or configure an export target. App-created backups and exercise media remain in local or user-selected storage until you share or export them. After data is sent or shared, the recipient or external provider controls its copy.
 
-Since FitoTrack stores all data locally on your device, you are in full control of your data at all times. You can delete individual workouts within the app, or remove all app data by uninstalling FitoTrack or clearing the app data via your device's system settings. There is no account and no server-side data to request deletion of.
+## AI prompts
 
-## Usage of the map
+FitRegimen does not contact an AI service or send data automatically: prompts are created on your device. If you include profiles, goals, preferences, restrictions, or a selected training program, those details can appear in the prompt. They leave the app only when you copy or share the prompt with a service you choose; that service’s privacy policy then applies. The prompt asks the service to use personal details only for calculations and not reproduce them in the finished file, but FitRegimen cannot guarantee how a third-party service behaves. Review the selected data before sending.
 
-The map displayed in FitoTrack is loaded from OpenStreetMap. Please refer to their [Privacy Policy](https://wiki.osmfoundation.org/wiki/Privacy_Policy) to learn more about how the data are used that you provide with your map requests such as your IP-address.
+## Your control
 
-## Transparency
+You can edit or delete app records and profiles, remove files from chosen storage, revoke system permissions, or clear the app’s data. Clearing local data cannot recall copies that were already exported or shared.
 
-You can read through the [source code](https://codeberg.org/jannis/FitoTrack) of FitoTrack to ensure the given information is correct.
+FitRegimen is based on FitoTrack by Jannis Scheibe and contributors. This document
+describes the FitRegimen fork; its [source code](https://github.com/IgorNadein/FitRegimen)
+is available for inspection.

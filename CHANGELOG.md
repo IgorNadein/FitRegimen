@@ -4,7 +4,22 @@ This changelog covers the FitRegimen fork. Upstream activity recording and its
 history belong to [FitoTrack](https://codeberg.org/jannis/FitoTrack/releases) by
 Jannis Scheibe and contributors. FitRegimen release numbers start at 0.1.0;
 the previous development APK inherited upstream's 16.2 label. Android versionCode
-continues increasing (1621) to preserve the update ordering.
+continues increasing (1622) to preserve the update ordering.
+
+## [0.2.0] — 2026-09-09
+
+- Added **Settings → Updates** in English, Russian, German and Spanish, following
+  the GitHub Releases → APK → Android installer approach used in Palenok and 12609.
+- Check the latest stable release on opening the update screen; download explicitly
+  with progress and cancellation; hand installation to Android with user confirmation.
+- Validate release metadata, HTTPS download destinations, size and SHA-256, then
+  verify APK package, increasing versionCode, declared version and signing certificate.
+  Recheck cached APKs before installation; remove incomplete downloads.
+- Guide users through Android's permission to install from FitRegimen. Release updates
+  preserve local data. Debug builds remain separate and do not offer release installation.
+- Document release metadata and update privacy. No profile, nutrition or workout data
+  is included in update requests; no startup/background update checks were added.
+- Users of 0.1.0 must install 0.2.0 manually once to obtain the updater.
 
 ## [0.1.0] — 2026-09-09
 
@@ -49,3 +64,5 @@ First downloadable FitRegimen portfolio release.
   this release does not claim a warning-free lint/build audit.
 
 [0.1.0]: https://github.com/IgorNadein/FitRegimen/releases/tag/v0.1.0
+
+[0.2.0]: https://github.com/IgorNadein/FitRegimen/releases/tag/v0.2.0

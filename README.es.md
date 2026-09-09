@@ -31,12 +31,14 @@ Capturas de la aplicación Android con los [archivos de demostración](doc/demo)
 
 ## Pruébalo
 
-1. Instala **FitRegimen-0.1.0.apk**, firmado y disponible en [Releases](https://github.com/IgorNadein/FitRegimen/releases/latest), en Android **8.0 o posterior**.
+1. Instala **FitRegimen-0.2.0.apk**, firmado y disponible en [Releases](https://github.com/IgorNadein/FitRegimen/releases/latest), en Android **8.0 o posterior**.
 2. Descarga [program.json](https://raw.githubusercontent.com/IgorNadein/FitRegimen/master/doc/demo/program.json). Selecciónalo en **Programas → + → Importar programa**.
 3. Abre **Quick walkthrough**, confirma dos series, completa el temporizador de 20 segundos y consulta el resultado.
 4. Exporta una copia de seguridad y restáurala. La [guía de demostración](doc/demo/README.md) detalla los pasos y resultados esperados, incluyendo alimentación e importación de IA.
 
 La demo no necesita cuenta, registro GPS ni servicio externo de IA. Los archivos contienen datos ficticios para mostrar la interfaz, no recomendaciones personales de entrenamiento o alimentación.
+
+Desde la versión 0.2.0, abre **Ajustes → Actualizaciones** para consultar GitHub Releases, descargar un APK verificado y abrir el instalador de Android. Si tienes la versión 0.1.0, actualízala manualmente una vez. [Detalles técnicos](doc/updates.md).
 
 ## Qué significa «IA» en esta aplicación
 

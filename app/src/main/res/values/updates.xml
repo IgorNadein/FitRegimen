@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="updatesTitle">Updates</string>
+    <string name="updatesDescription">Opening this screen checks GitHub for the latest stable FitRegimen release. No workout or profile data is sent.</string>
+    <string name="updatesCurrent">Installed version: %1$s</string>
+    <string name="updatesDebug">In-app updates are available in the signed release app. Development builds use a separate package.</string>
+    <string name="updatesChecking">Checking for updates…</string>
+    <string name="updatesFailed">Could not complete the update</string>
+    <string name="updatesAvailable">Version %1$s is available</string>
+    <string name="updatesLatest">You have the latest available version.</string>
+    <string name="updatesSummary">Check for a new version and download its APK</string>
+    <string name="updatesPermission">Allow installation from FitRegimen in Android settings, return here, then tap Install update again.</string>
+    <string name="updatesCancelling">Cancelling download…</string>
+    <string name="updatesProgress">Downloaded: %1$d%%</string>
+    <string name="updatesVerifying">Verifying the downloaded APK…</string>
+    <string name="updatesInstall">Install update</string>
+    <string name="updatesDownload">Download update</string>
+    <string name="updatesCheck">Check again</string>
+    <string name="updatesWhatsNew">Release notes</string>
+    <string name="updatesInstallExplanation">You choose when to download and install. Android asks for installation permission and confirmation. Updating a release signed with the same key preserves your app data.</string>
+    <string name="updatesErrorNetwork">Could not connect to GitHub. Check your connection and try again.</string>
+    <string name="updatesErrorNoRelease">No published release was found. Try again later.</string>
+    <string name="updatesErrorRateLimit">GitHub has temporarily limited requests. Try again later.</string>
+    <string name="updatesErrorRelease">The release has missing or invalid update details. Check the release notes or try again later.</string>
+    <string name="updatesErrorDownload">The download is incomplete or its checksum does not match. Download it again.</string>
+    <string name="updatesErrorApk">The downloaded file is not a readable Android application.</string>
+    <string name="updatesErrorPackage">This APK belongs to another application. Installation was blocked.</string>
+    <string name="updatesErrorOld">This APK is not newer than the installed version.</string>
+    <string name="updatesErrorVersion">The APK version does not match the release. Installation was blocked.</string>
+    <string name="updatesErrorSignature">The APK signature does not match this installation. Installation was blocked.</string>
+    <string name="updatesErrorInstaller">Could not open the Android installer or installation settings. Try again.</string>
+    <string name="updatesPrivacy">Opening Updates contacts GitHub to check the latest release. Downloading an update contacts GitHub and its asset servers. They receive ordinary request information, including your IP address; no profile, nutrition, workout or backup data is sent. APK files remain in the app cache and are shared with the Android installer only when you request installation. Android controls permission to install from FitRegimen.</string>
+</resources>

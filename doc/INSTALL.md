@@ -7,7 +7,7 @@
 Requires **Android 8.0 (API 26) or newer**. No account or API key is required.
 
 1. Open [FitRegimen Releases](https://github.com/IgorNadein/FitRegimen/releases/latest).
-2. Download **FitRegimen-0.1.0.apk** from **Assets** to your phone. This is the signed
+2. Download **FitRegimen-0.2.0.apk** from **Assets** to your phone. This is the signed
    release APK; the source ZIP and unsigned CI artifact are not installable apps.
 3. Open the APK. If Android asks, allow **Install unknown apps** for the browser or
    file manager you used, then return to the installer and tap **Install**.
@@ -24,7 +24,7 @@ Optional verification on a computer, from the folder containing the release asse
 
 ```sh
 sha256sum -c SHA256SUMS.txt
-adb install -r FitRegimen-0.1.0.apk
+adb install -r FitRegimen-0.2.0.apk
 ```
 
 Download all files listed in `SHA256SUMS.txt` before checking it. The release signing
@@ -39,7 +39,7 @@ c4467a4fb5a75c238509f6bf2cf44db6e8ac17efc72fd358abf0f1456a3df7bd
 Нужен **Android 8.0 (API 26) или новее**. Аккаунт и API-ключ не требуются.
 
 1. Откройте [последний релиз](https://github.com/IgorNadein/FitRegimen/releases/latest).
-2. Скачайте **FitRegimen-0.1.0.apk** из раздела **Assets** на телефон. Это подписанная
+2. Скачайте **FitRegimen-0.2.0.apk** из раздела **Assets** на телефон. Это подписанная
    release-сборка. Архив исходников и неподписанный артефакт CI установить нельзя.
 3. Откройте APK. Если Android запросит разрешение, включите **Установку неизвестных
    приложений** для использованного браузера или файлового менеджера, затем
@@ -53,6 +53,27 @@ c4467a4fb5a75c238509f6bf2cf44db6e8ac17efc72fd358abf0f1456a3df7bd
 APK с другой подписью, перед удалением сохраните резервную копию: удаление приложения
 стирает его локальные данные. Команды проверки контрольных сумм и установки через ADB
 приведены выше.
+
+## Updates / Обновления
+
+From **0.2.0**, open **Settings → Updates**. The screen checks the latest stable
+GitHub release. Tap **Download update**, then **Install update**. If Android opens
+installation settings, allow installation from FitRegimen, return to the app and
+press **Install update** again. Confirm the update in the system installer.
+The app checks SHA-256, package, numeric version and signing certificate before
+installation. It preserves local data when updated with the same signing key.
+Downloads are optional and cancellable; no background checks run at app startup.
+
+Начиная с **0.2.0**, откройте **Настройки → Обновления → Скачать обновление →
+Установить обновление**. При запросе разрешите установку из FitRegimen в настройках
+Android, вернитесь и ещё раз нажмите «Установить обновление». Подтвердите установку
+в системном окне. Данные сохраняются при обновлении с той же подписью.
+
+**0.1.0 has no updater:** install 0.2.0 manually over it once, without uninstalling.
+**В 0.1.0 этого механизма нет:** один раз установите 0.2.0 поверх неё вручную,
+не удаляя приложение. Следующие релизы можно будет получать через настройки.
+
+[Release metadata, checks and maintainer contract](updates.md).
 
 ## Building from source
 
@@ -92,7 +113,10 @@ installation. CI currently runs JVM tests, not emulator/instrumentation tests.
 4. Commit the release documentation and screenshots. Push the commit, wait for a
    successful Android workflow, tag that commit, and publish its signed APK,
    `program.json`, `nutrition.json`, demo backup and `SHA256SUMS.txt` in GitHub Releases.
-5. Use the same private key for future updates. CI intentionally receives no signing
+5. Include a standalone `Version code: NUMBER` line in release notes and attach
+   exactly one `FitRegimen-VERSION.apk` with a GitHub `sha256:` digest. Publish it as
+   a stable `vVERSION` release marked latest. See [the updater contract](updates.md).
+6. Use the same private key for future updates. CI intentionally receives no signing
    secrets and produces no automatically published release.
 
 Action references: [Android SDK setup](https://github.com/android-actions/setup-android),

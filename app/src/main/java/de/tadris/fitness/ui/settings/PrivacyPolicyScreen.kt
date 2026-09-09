@@ -104,6 +104,12 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
                         body = stringResource(R.string.privacyPolicyNetworkBody),
                     )
                 }
+                item(key = "updates") {
+                    PrivacySection(
+                        title = stringResource(R.string.updatesTitle),
+                        body = stringResource(R.string.updatesPrivacy),
+                    )
+                }
                 item(key = "sharing") {
                     PrivacySection(
                         title = stringResource(R.string.privacyPolicySharingTitle),

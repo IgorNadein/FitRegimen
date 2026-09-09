@@ -89,6 +89,7 @@ import de.tadris.fitness.ui.record.GpsRecordingRoute
 import de.tadris.fitness.ui.record.IndoorRecordingRoute
 import de.tadris.fitness.ui.record.RecordingAutoStopGoal
 import de.tadris.fitness.ui.session.GuidedWorkoutRoute
+import de.tadris.fitness.ui.updates.UpdatesScreen
 import de.tadris.fitness.ui.settings.AboutScreen
 import de.tadris.fitness.ui.settings.BackupSettingsScreen
 import de.tadris.fitness.ui.settings.ConfigureExportTargetsScreen
@@ -147,6 +148,9 @@ sealed interface Route {
 
     @Serializable
     data object Settings : Route
+
+    @Serializable
+    data object Updates : Route
 
     @Serializable
     data object InterfaceSettings : Route
@@ -728,10 +732,14 @@ fun AppNavigation(
                     onNavigateToDebugSettings = {
                         navController.navigate(Route.DebugSettings)
                     },
+                    onNavigateToUpdates = { navController.navigate(Route.Updates) },
                     onNavigateToAbout = {
                         navController.navigate(Route.About)
                     },
                 )
+            }
+            composable<Route.Updates> {
+                UpdatesScreen(onBack = { navController.popBackStack() })
             }
             composable<Route.About> {
                 AboutScreen(

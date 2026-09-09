@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="updatesTitle">Обновления</string>
+    <string name="updatesDescription">При открытии этого экрана приложение проверяет последний стабильный релиз FitRegimen на GitHub. Данные тренировок и профилей не отправляются.</string>
+    <string name="updatesCurrent">Установлена версия: %1$s</string>
+    <string name="updatesDebug">Обновления доступны в подписанной release-сборке. Сборка для разработки использует отдельный пакет.</string>
+    <string name="updatesChecking">Проверка обновлений…</string>
+    <string name="updatesFailed">Не удалось завершить обновление</string>
+    <string name="updatesAvailable">Доступна версия %1$s</string>
+    <string name="updatesLatest">У вас последняя доступная версия.</string>
+    <string name="updatesSummary">Проверить новую версию и скачать APK</string>
+    <string name="updatesPermission">Разрешите установку из FitRegimen в настройках Android, вернитесь сюда и снова нажмите «Установить обновление».</string>
+    <string name="updatesCancelling">Отмена загрузки…</string>
+    <string name="updatesProgress">Загружено: %1$d%%</string>
+    <string name="updatesVerifying">Проверка загруженного APK…</string>
+    <string name="updatesInstall">Установить обновление</string>
+    <string name="updatesDownload">Скачать обновление</string>
+    <string name="updatesCheck">Проверить снова</string>
+    <string name="updatesWhatsNew">Что нового</string>
+    <string name="updatesInstallExplanation">Вы сами запускаете загрузку и установку. Android запрашивает разрешение и подтверждение установки. Обновление с той же подписью сохраняет данные приложения.</string>
+    <string name="updatesErrorNetwork">Не удалось подключиться к GitHub. Проверьте соединение и повторите попытку.</string>
+    <string name="updatesErrorNoRelease">Опубликованный релиз не найден. Попробуйте позже.</string>
+    <string name="updatesErrorRateLimit">GitHub временно ограничил запросы. Попробуйте позже.</string>
+    <string name="updatesErrorRelease">Данные обновления в релизе отсутствуют или некорректны. Откройте описание релиза или попробуйте позже.</string>
+    <string name="updatesErrorDownload">Файл загружен не полностью или его контрольная сумма не совпадает. Скачайте его заново.</string>
+    <string name="updatesErrorApk">Загруженный файл не удалось прочитать как приложение Android.</string>
+    <string name="updatesErrorPackage">Этот APK принадлежит другому приложению. Установка заблокирована.</string>
+    <string name="updatesErrorOld">Этот APK не новее установленной версии.</string>
+    <string name="updatesErrorVersion">Версия APK не соответствует релизу. Установка заблокирована.</string>
+    <string name="updatesErrorSignature">Подпись APK не совпадает с установленным приложением. Установка заблокирована.</string>
+    <string name="updatesErrorInstaller">Не удалось открыть установщик или настройки установки Android. Повторите попытку.</string>
+    <string name="updatesPrivacy">При открытии экрана обновлений приложение обращается к GitHub за последним релизом. При скачивании APK оно обращается к GitHub и его файловым серверам. Они получают обычные данные сетевого запроса, включая IP-адрес; данные профилей, питания, тренировок и резервных копий не отправляются. APK хранится в кэше приложения и передаётся установщику Android только по вашему запросу. Разрешение на установку из FitRegimen контролирует Android.</string>
+</resources>
