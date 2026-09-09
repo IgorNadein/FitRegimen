@@ -20,6 +20,7 @@
  */
 package de.tadris.fitness.data.backup.model
 
+import com.fasterxml.jackson.annotation.JsonAlias
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import de.tadris.fitness.data.WorkoutType
 
@@ -82,6 +83,7 @@ data class LegacyProgramTaskExport(
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class DayExport(
     val name: String? = null,
+    @param:JsonAlias("rest")
     val isRest: Boolean = false,
     val exercises: List<ExerciseEntryExport> = emptyList(),
 )

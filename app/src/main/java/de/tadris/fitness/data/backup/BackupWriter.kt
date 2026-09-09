@@ -20,8 +20,6 @@
 package de.tadris.fitness.data.backup
 
 import android.content.Context
-import com.fasterxml.jackson.core.JsonGenerator
-import com.fasterxml.jackson.databind.json.JsonMapper
 import de.tadris.fitness.Instance
 import de.tadris.fitness.R
 import de.tadris.fitness.data.WorkoutData
@@ -52,9 +50,7 @@ class BackupWriter(
     }
 
     private val db = Instance.getInstance(context).db
-    private val mapper = JsonMapper.builder()
-        .disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET)
-        .build()
+    private val mapper = backupJsonMapper()
 
     fun write() {
         val destination = output.absoluteFile

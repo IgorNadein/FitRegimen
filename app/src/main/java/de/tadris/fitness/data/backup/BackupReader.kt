@@ -9,10 +9,6 @@ import android.content.Context
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
-import com.fasterxml.jackson.core.StreamReadFeature
-import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.module.kotlin.jsonMapper
-import com.fasterxml.jackson.module.kotlin.kotlinModule
 import de.tadris.fitness.Instance
 import de.tadris.fitness.R
 import de.tadris.fitness.data.AppDatabase
@@ -64,13 +60,7 @@ class BackupReader(
     private val importedWorkoutTypeIdMap = mutableMapOf<String, String>()
     private val importedProgramUuidMap = mutableMapOf<String, String>()
     private val importedProgramContentIdentityMap = mutableMapOf<String, String>()
-    private val mapper = jsonMapper {
-        addModule(kotlinModule())
-        configure(StreamReadFeature.IGNORE_UNDEFINED, true)
-        configure(StreamReadFeature.AUTO_CLOSE_SOURCE, false)
-        disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-        enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-    }
+    private val mapper = backupJsonMapper()
 
     @Throws(IOException::class, UnsupportedVersionException::class)
     fun read() {

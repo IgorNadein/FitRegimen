@@ -6,6 +6,7 @@
  */
 package de.tadris.fitness.data.backup.model
 
+import com.fasterxml.jackson.annotation.JsonAlias
 import de.tadris.fitness.data.FitnessProfile
 import de.tadris.fitness.data.FitnessProfileDraft
 
@@ -16,6 +17,7 @@ import de.tadris.fitness.data.FitnessProfileDraft
 data class FitnessProfileExport(
     val uuid: String = "",
     val name: String = "",
+    @param:JsonAlias("active")
     val isActive: Boolean = false,
     val birthDateEpochDay: Long? = null,
     val heightCm: Double? = null,
