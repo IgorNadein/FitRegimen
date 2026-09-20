@@ -27,7 +27,7 @@ jobs:
       - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
       - name: Install Android SDK
         run: sdkmanager 'platforms;android-37.0' 'build-tools;36.0.0'
-      - uses: gradle/actions/setup-gradle@67621b124fd2e251c5e8a0e6e3b91318f2287669 # v6.3.0
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
       - name: Run JVM tests
         run: ./gradlew --no-daemon --stacktrace testDebugUnitTest
       - name: Build APKs
